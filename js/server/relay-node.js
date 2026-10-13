@@ -13,7 +13,7 @@ http.createServer((req,res)=>{
   let b='';req.on('data',d=>b+=d);req.on('end',async()=>{
     const j=JSON.parse(b||'{}');const send=(o,code=200)=>{res.writeHead(code,{'content-type':'application/json',...CORS});res.end(JSON.stringify(o))};
     try{
-      if(req.url==='/api/create'){const id_=id();rooms.set(id_,{host:{secret:sec(),team:j.team||null,name:j.name||'Anfitrión'},guest:null});send({id:id_,secret:rooms.get(id_).host.secret})}
+      if(req.url==='/api/create'){const id_=id();rooms.set(id_,{host:{secret:sec(),team:j.team||null,name:j.name||'Anfitrión'},guest:null});send({id:id_,secret:rooms.get(id_).host.secret,role:'host'})}
       else if(req.url==='/api/join'){const r=rooms.get(j.id);if(!r)return send({error:'Sala no encontrada'},404);if(r.guest)return send({error:'Sala llena'},409);r.guest={secret:sec(),team:null,name:j.name||'Rival'};send({secret:r.guest.secret})}
       else if(req.url==='/api/submit'){const r=rooms.get(j.id);if(!r)return send({error:'Sala no encontrada'},404);const slot=r.host.secret===j.secret?'host':(r.guest&&r.guest.secret===j.secret?'guest':null);if(!slot)return send({error:'Credencial inválida'},403);r[slot].team=j.team;r[slot].name=j.name||r[slot].name;send({ok:true})}
       else if(req.url==='/api/peek'){const r=rooms.get(j.id);if(!r)return send({error:'Sala no encontrada'},404);const me=r.host.secret===j.secret?'host':(r.guest&&r.guest.secret===j.secret?'guest':null);if(!me)return send({error:'Credencial inválida'},403);const other=me==='host'?'guest':'host';const mine=r[me].team;const hasBoth=mine&&r[other]&&r[other].team;
