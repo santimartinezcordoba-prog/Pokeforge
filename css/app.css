@@ -263,3 +263,12 @@ textarea{font-family:var(--mono);resize:vertical;min-height:250px;line-height:1.
 .statrow .sf{text-align:right;color:var(--ink);font-weight:600}
 .stats-load{color:var(--dim);font-size:12px;padding:6px}
 .evleft{float:right;font-family:var(--mono);font-size:11px;color:var(--ok);text-transform:none;letter-spacing:0;font-weight:700}
+select option{color:#0a0d15;background:#fff}
+select option:checked{background:#4aa3ff;color:#fff}
+input:not([type=checkbox]):not([type=radio]),select,textarea{background:#fff!important;color:#000!important}
+input::placeholder,textarea::placeholder{color:#555!important;opacity:1!important}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active{
+  -webkit-text-fill-color:#000!important;
+  -webkit-box-shadow:0 0 0 1000px #fff inset!important;
+  transition:background-color 9999s 9999s!important;
+}
