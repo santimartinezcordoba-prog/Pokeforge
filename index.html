@@ -465,10 +465,10 @@ const Store=(()=>{
     get relayUrl(){return relayUrl},
     set relayUrl(v){relayUrl=v;localStorage.setItem('cpaste.relay',v)},
     on,emit,
-    create:(t,n)=>rel('/api/create',{team:t,name:n}).then(j=>({id:j.id,secret:j.secret,role:'host'})),
-    join:(id)=>rel('/api/join',{id}).then(j=>({id,secret:j.secret,role:'guest'})),
-    submit:(id,sk,t,n)=>rel('/api/submit',{id,secret:sk,team:t,name:n}),
-    peek:(id,sk)=>rel('/api/peek',{id,secret:sk}),
+    create:(t,n)=>rel('/api/create',{p1Name:n}).then(j=>({id:j.code,secret:j.side,role:'host'})),
+    join:(id)=>rel('/api/join',{room:id}).then(j=>({id:j.code,secret:j.side,role:'guest'})),
+    submit:(id,sk,t,n)=>rel('/api/submit',{room:id,side:sk,team:t,name:n}),
+    peek:(id)=>rel('/api/peek',{room:id}),
     myRooms:()=>[],
     forget(){}
   };
