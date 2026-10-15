@@ -1001,6 +1001,7 @@ function stopPoll(){
   if(pollTimer){clearInterval(pollTimer);pollTimer=null}
 }
 
+// === renderRoomView ===
 function renderRoomView(){
   const app=document.getElementById('app');
   if(!location.hash.startsWith('#/sala/'))return;
@@ -1009,10 +1010,16 @@ function renderRoomView(){
     app.appendChild(h('<div class="card"><h3>Esta sala no está cargada</h3><p style="color:var(--muted)">Entra desde <a href="#/unirse">Unirse</a> con el código.</p></div>'));
     return;
   }
-  const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span><span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
+  const editing=room.status!=='revealed';
+  const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span>'+(editing?'<button class="btn btn-sm" id="ri">📥 Pegar paste</button><button class="btn btn-sm" id="re">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="rc">🗑 Limpiar</button>':'')+'<span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
   app.appendChild(top);
   top.querySelector('#sh').onclick=shareCode;
   top.querySelector('#back').onclick=()=>{location.hash='#/constructor'};
+  if(editing){
+    top.querySelector('#ri').onclick=openImport;
+    top.querySelector('#re').onclick=()=>copy(exportTeam(sets.filter(s=>s.species)));
+    top.querySelector('#rc').onclick=()=>{sets=sets.map(()=>({}));renderSlots();renderPreview()};
+  }
   const sb=h('<div style="margin:18px 0"></div>');
   app.appendChild(sb);
   if(room.status==='waiting')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> Tu equipo está sellado. Esperando a que el rival suba el suyo…</div>'));
@@ -1032,6 +1039,7 @@ function renderRoomView(){
   pub.querySelector('#pb').onclick=onPublish;
   startPoll();
 }
+// === /renderRoomView ===
 function buildReveal(){
   const mine=room.you||[],them=room.them||[];
   const wrap=h('<div class="vs-seam">VS · análisis cruzado</div><div class="reveal"></div>');
@@ -1200,6 +1208,22 @@ function viewSettings(){
     DexCache.pokemon=DexCache.items=null;
     toast('Caché vaciada','ok');
   };
+}
+function viewRooms(){
+  const app=document.getElementById('app');
+  app.innerHTML='';
+  const rs=Store.myRooms();
+  app.appendChild(h('<h2 class="section-title">Mis salas ('+rs.length+')</h2><div class="roomlist" id="rl"></div>'));
+  const rl=app.querySelector('#rl');
+  if(!rs.length){rl.appendChild(h('<p style="color:var(--dim)">No tienes salas en este navegador.</p>'));return}
+  rs.sort((a,b)=>b.createdAt-a.createdAt).forEach(r=>{
+    const role=r.host&&r.host.team?'host':'guest';
+    const secret=(r.host&&r.host.secret)||(r.guest&&r.guest.secret)||'';
+    const row=h('<div class="roomrow"><span class="rid">'+r.id+'</span><span style="color:var(--muted)">'+(r.guest?(r.guest.team?'revelada':'rival esperando'):'sin rival')+'</span><span style="flex:1"></span><button class="btn btn-sm" data-open>Abrir</button><button class="btn btn-sm btn-danger" data-del>Borrar</button></div>');
+    row.querySelector('[data-open]').onclick=()=>{room={id:r.id,secret:secret,role:role,status:r.guest&&r.guest.team?'revealed':'waiting',you:r.host&&r.host.team?r.host.team:[]};location.hash='#/sala/'+r.id};
+    row.querySelector('[data-del]').onclick=()=>{Store.forget(r.id);toast('Sala '+r.id+' borrada','ok');viewRooms()};
+    rl.appendChild(row);
+  });
 }
 function startBg(){
   const cv=document.getElementById('spritefield');
