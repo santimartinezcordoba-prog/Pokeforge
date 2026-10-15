@@ -71,6 +71,7 @@ h1,h2,h3,h4{font-family:var(--disp);font-weight:800;letter-spacing:-.02em;line-h
 .slot-ctl{margin-left:auto;display:flex;gap:4px}.icon-btn{width:26px;height:26px;border-radius:7px;border:1px solid var(--line2);background:#0e1626;color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:13px;line-height:1;padding:0}.icon-btn:hover{color:var(--ink);border-color:var(--accent);background:#16223a}
 .slot-body{border-top:1px solid var(--line);padding:14px 14px 16px 16px;display:none}.slot.open .slot-body{display:block;animation:slidein .22s ease}@keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .empty-add{padding:24px 16px;text-align:center;color:var(--dim)}.empty-add button{margin-top:8px}
+.empty-add .combo{max-width:260px;margin:8px auto 0;text-align:left}
 .field{margin-bottom:11px}.field>label{display:block;font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);font-weight:800;margin-bottom:4px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 select,input[type=text],input[type=number],textarea{width:100%;background:#0c1220;border:1px solid var(--line2);border-radius:9px;padding:8px 10px;font-size:13.5px}
@@ -86,7 +87,6 @@ textarea{font-family:var(--mono);resize:vertical;min-height:260px;line-height:1.
 .ivrow{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.ivrow label{font-size:9.5px;text-align:center}.ivrow input{text-align:center;padding:5px 2px;font-family:var(--mono);font-size:12px}
 .qbtns{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.qbtn{border:1px solid var(--line2);background:#0e1626;border-radius:7px;padding:3px 9px;font-size:11.5px;cursor:pointer;color:var(--muted);font-family:var(--mono)}.qbtn:hover{color:var(--ink);border-color:var(--accent)}
 .moves{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-/* ---- panel de estadísticas (estilo Showdown) ---- */
 .statgrid{display:flex;flex-direction:column;gap:4px;background:#0a111d;border:1px solid var(--line);border-radius:9px;padding:8px 10px}
 .statrow{display:grid;grid-template-columns:42px 34px 1fr 50px;align-items:center;gap:8px;font-family:var(--mono);font-size:12px}
 .statrow .sl{color:var(--muted)}.statrow .sb{text-align:right;color:var(--dim)}
@@ -163,124 +163,550 @@ function finalStat(base,stat,iv,ev,nature,level){
   return Math.floor((Math.floor((2*base+iv+Math.floor(ev/4))*level/100)+5)*m);
 }
 
+/* ================= CACHE / AJUSTES ================= */
+const DexCache={pokemon:null,items:null,details:{}};
+let dexIndexCache={};
 const Settings=Object.assign({sprite:'showdown',shiny:false,size:6,name:''},JSON.parse(localStorage.getItem('cpaste.settings')||'{}'));
 function saveSettings(){localStorage.setItem('cpaste.settings',JSON.stringify(Settings))}
-function spriteShowdown(n,f,st,sh){st=st||Settings.sprite;const s=pokeSlug(n,f);const map={showdown:'pokemon',pokemon:'pokemon',gen5:'gen5',ani:'gen5ani',gen5ani:'gen5ani',xy:'xy',orig:'orig',xyani:'xyani'};let dir=map[st]||'pokemon';const gif=(dir==='pokemon'||dir==='gen5ani'||dir==='xyani');let path=dir;if(sh){if(dir==='pokemon')path='pokemon-shiny';else if(dir==='xy')path='xy-shiny';else if(dir==='xyani')path='xyani-shiny';else path=dir+'/shiny'}return SD+'/'+path+'/'+s+(gif?'.gif':'.png')}function idByName(name){const n=String(name||'').trim();if(!n)return 1;const key=slug(n);for(const k in dexIndexCache){if(slug(k)===key&&dexIndexCache[k]&&dexIndexCache[k].id)return dexIndexCache[k].id}if(typeof DexCache!=='undefined'&&DexCache.pokemon){const p=DexCache.pokemon.find(x=>x.name===key);if(p)return p.id}const num=Number(n);if(num)return num;return 1}
-function spritePokeAPI(n,sh){const id=idByName(n);return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+(sh?'shiny/':'')+id+'.png'}function itemShowdown(n){return SD+'/itemicons/'+slug(n)+'.png'}
+
+/* ================= SPRITES / IMÁGENES ================= */
+function spriteShowdown(n,f,st,sh){
+  st=st||Settings.sprite;
+  const s=pokeSlug(n,f);
+  const map={showdown:'pokemon',pokemon:'pokemon',gen5:'gen5',ani:'gen5ani',gen5ani:'gen5ani',xy:'xy',orig:'orig',xyani:'xyani'};
+  let dir=map[st]||'pokemon';
+  const gif=(dir==='gen5ani'||dir==='xyani');
+  let path=dir;
+  if(sh){
+    if(dir==='pokemon')path='pokemon-shiny';
+    else if(dir==='xy')path='xy-shiny';
+    else if(dir==='xyani')path='xyani-shiny';
+    else if(dir==='gen5ani')path='gen5ani/shiny';
+    else path=dir+'/shiny';
+  }
+  return SD+'/'+path+'/'+s+(gif?'.gif':'.png');
+}
+function spritePokeAPI(n,sh){
+  return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+(sh?'shiny/':'')+idByName(n)+'.png';
+}
+function itemShowdown(n){return SD+'/itemicons/'+slug(n).replace(/-/g,'')+'.png'}
 function itemPokeAPI(n){return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+slug(n)+'.png'}
+function idByName(name){
+  const raw=String(name||'').trim();
+  if(!raw)return 1;
+  const sl=slug(raw);
+  if(DexCache.details[raw]&&DexCache.details[raw].id)return DexCache.details[raw].id;
+  if(DexCache.details[sl]&&DexCache.details[sl].id)return DexCache.details[sl].id;
+  const exact=(DexCache.pokemon||[]).find(p=>p.name===sl);
+  if(exact)return exact.id;
+  if(raw.includes('-')){
+    const base=slug(raw.split('-')[0]);
+    const b=(DexCache.pokemon||[]).find(p=>p.name===base);
+    if(b)return b.id;
+  }
+  for(const k in dexIndexCache){
+    if(slug(k)===sl&&dexIndexCache[k]&&dexIndexCache[k].id)return dexIndexCache[k].id;
+  }
+  const num=Number(raw);
+  if(num)return num;
+  return 1;
+}
+function spriteCandidates(n,f){
+  const out=[];
+  const add=x=>{x=String(x||'').trim();if(x&&!out.includes(x))out.push(x)};
+  if(f)add(pokeSlug(n,f));
+  add(n);
+  const sl=slug(n);
+  add(sl);
+  const nos=sl.replace(/-/g,'');
+  if(nos)add(nos);
+  const parts=sl.split('-');
+  if(parts.length>1){
+    const base=parts[0], suffix=parts.slice(1).join('-');
+    add(base+'-'+suffix);
+    if(base==='ogerpon'&&!suffix.includes('mask'))add(base+'-'+suffix+'-mask');
+    add(base);
+  }
+  if(f){
+    const b=slug(n), fs=slug(f);
+    if(fs)add(b+'-'+fs);
+  }
+  return out;
+}
+function spr(n,f,style,sh){
+  n=String(n||'').trim();
+  if(!n)return '';
+  const st=style||Settings.sprite;
+  const shine=!!sh;
+  const urls=[];
+  for(const cand of spriteCandidates(n,f)){
+    urls.push(spriteShowdown(cand,'',st,true));
+    urls.push(spriteShowdown(cand,'',st,false));
+  }
+  urls.push(spritePokeAPI(n,shine));
+  urls.push(spritePokeAPI(n,false));
+  const base=n.split('-')[0];
+  if(base!==n){
+    urls.push(spritePokeAPI(base,false));
+    urls.push(spritePokeAPI(base,true));
+  }
+  const uniq=[...new Set(urls.filter(Boolean))];
+  if(!uniq.length)return '';
+  return '<img loading="lazy" src="'+uniq[0]+'" data-urls="'+esc(uniq.slice(1).join('|'))+'" onerror="imgNext(this)" alt="'+esc(n)+'">';
+}
+function itemImg(n){
+  if(!n)return '';
+  const a=slug(n), b=a.replace(/-/g,'');
+  const urls=[SD+'/itemicons/'+b+'.png', SD+'/itemicons/'+a+'.png', itemPokeAPI(n)];
+  return '<img loading="lazy" src="'+urls[0]+'" data-urls="'+esc(urls.slice(1).join('|'))+'" onerror="imgNext(this)" alt="'+esc(n)+'">';
+}
+function imgNext(img){
+  const u=(img.dataset.urls||'').split('|').filter(Boolean);
+  if(!u.length){img.style.visibility='hidden';return}
+  img.src=u.shift();
+  img.dataset.urls=u.join('|');
+}
+async function copy(t){
+  try{
+    await navigator.clipboard.writeText(t);
+    toast('Copiado','ok');
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=t;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    toast('Copiado','ok');
+  }
+}
+function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
 
 /* ================= PARSE / EXPORT ================= */
-function blank(){return{species:'',nickname:'',gender:'',item:'',ability:'',nature:'',tera:'',level:100,shiny:false,evs:{},ivs:{},moves:[]}}
-function normKey(s){s=s.toLowerCase().replace(/[^a-z]/g,'');if(s==='hp')return'hp';if(s==='atk'||s==='attack')return'atk';if(s==='def'||s==='defense')return'def';if(s==='spa'||s==='spatk'||s==='specialattack')return'spa';if(s==='spd'||s==='spdef'||s==='specialdefense')return'spd';if(s==='spe'||s==='speed')return'spe';return null}
-function parseStatLine(t){const o={};for(const p of t.split('/')){const m=p.trim().match(/^(\d+)\s+(.+)$/);if(!m)continue;const k=normKey(m[2]);if(k)o[k]=+m[1]}return o}
+function blank(){return{species:'',nickname:'',gender:'',item:'',ability:'',nature:'',tera:'',level:100,shiny:false,evs:{},ivs:{},moves:[],form:''}}
+function normKey(s){
+  s=String(s||'').toLowerCase().replace(/[^a-z]/g,'');
+  if(s==='hp')return'hp';
+  if(s==='atk'||s==='attack')return'atk';
+  if(s==='def'||s==='defense')return'def';
+  if(s==='spa'||s==='spatk'||s==='specialattack')return'spa';
+  if(s==='spd'||s==='spdef'||s==='specialdefense')return'spd';
+  if(s==='spe'||s==='speed')return'spe';
+  return null;
+}
+function parseStatLine(t){
+  const o={};
+  for(const p of t.split('/')){
+    const m=p.trim().match(/^(\d+)\s+(.+)$/);
+    if(!m)continue;
+    const k=normKey(m[2]);
+    if(k)o[k]=+m[1];
+  }
+  return o;
+}
 function parseHeader(str,s){
   if(/^Shiny\s+/i.test(str)){s.shiny=true;str=str.replace(/^Shiny\s+/i,'')}
-  const at=str.indexOf('@');if(at>-1){s.item=str.slice(at+1).trim();str=str.slice(0,at).trim()}
+  const at=str.indexOf('@');
+  if(at>-1){
+    s.item=str.slice(at+1).replace(/\s+/g,' ').trim();
+    str=str.slice(0,at).trim();
+  }
   const parens=[...str.matchAll(/\(([^)]*)\)/g)].map(m=>m[1]);
   str=str.replace(/\([^)]*\)/g,'').trim();
-  for(const p of parens){if(/^[MFN]$/i.test(p))s.gender=p.toUpperCase();else s.nickname=p}
+  const base=slug(str), part=base.includes('-')?base.split('-')[1]:'';
+  for(const p of parens){
+    const pp=String(p).trim();
+    if(/^[MFN]$/i.test(pp)){s.gender=pp.toUpperCase();continue}
+    const ps=slug(pp);
+    if(part&&(ps.includes(part)||part.includes(ps)))continue;
+    s.nickname=pp;
+  }
   s.species=str;
 }
 function parseTeam(text){
-  const lines=String(text||'').replace(/\r/g,'').split('\n');const sets=[];let cur=null;
+  const lines=String(text||'').replace(/\r/g,'').split('\n');
+  const sets=[];
+  let cur=null;
   const flush=()=>{if(cur&&(cur.species||cur.moves.length))sets.push(cur);cur=null};
   for(const raw of lines){
-    const t=raw.trim();if(!t)continue;
+    const t=raw.trim();
+    if(!t)continue;
     if(t.startsWith('- ')){if(!cur)cur=blank();cur.moves.push(t.slice(2).trim());continue}
-    if(t==='-'){continue}
-    if(/^Ability:/i.test(t)){if(!cur)cur=blank();cur.ability=t.slice(t.indexOf(':')+1).trim();continue}
-    if(/^Tera Type:/i.test(t)){if(!cur)cur=blank();cur.tera=t.slice(t.indexOf(':')+1).trim().toLowerCase();continue}
-    if(/^Level:/i.test(t)){if(!cur)cur=blank();cur.level=parseInt(t.replace(/\D+/g,''),10)||100;continue}
-    if(/^Shiny:\s*Yes$/i.test(t)){if(!cur)cur=blank();cur.shiny=true;continue}
-    if(/^Shiny:\s*No$/i.test(t)){if(!cur)cur=blank();cur.shiny=false;continue}
-    if(/^EVs?:/i.test(t)){if(!cur)cur=blank();cur.evs=parseStatLine(t.replace(/^EVs?:/i,''));continue}
-    if(/^IVs?:/i.test(t)){if(!cur)cur=blank();cur.ivs=parseStatLine(t.replace(/^IVs?:/i,''));continue}
+    if(t==='-')continue;
+    if(/^Ability\s*:/i.test(t)){if(!cur)cur=blank();cur.ability=t.slice(t.indexOf(':')+1).trim();continue}
+    if(/^Tera\s*Type\s*:/i.test(t)){if(!cur)cur=blank();cur.tera=t.slice(t.indexOf(':')+1).trim().toLowerCase();continue}
+    if(/^Level\s*:/i.test(t)){if(!cur)cur=blank();cur.level=parseInt(t.replace(/\D+/g,''),10)||100;continue}
+    if(/^Shiny\s*:/i.test(t)){if(!cur)cur=blank();cur.shiny=/yes/i.test(t);continue}
+    if(/^EVs?\s*:/i.test(t)){if(!cur)cur=blank();cur.evs=parseStatLine(t.replace(/^EVs?\s*:/i,''));continue}
+    if(/^IVs?\s*:/i.test(t)){if(!cur)cur=blank();cur.ivs=parseStatLine(t.replace(/^IVs?\s*:/i,''));continue}
     if(/Nature$/i.test(t)){if(!cur)cur=blank();cur.nature=t.replace(/\s*Nature$/i,'').trim();continue}
     if(cur&&(cur.moves.length||Object.keys(cur.evs).length||cur.nature||cur.ability||cur.shiny)){flush();cur=blank();parseHeader(t,cur);continue}
     if(t.includes('@')||t.includes('(')||!cur){flush();cur=blank();parseHeader(t,cur);continue}
   }
-  flush();return sets.filter(s=>s.species);
+  flush();
+  return sets.filter(s=>s.species);
 }
-function fmtStats(o){const lbl={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};return STATS.filter(k=>o&&o[k]).map(k=>o[k]+' '+lbl[k]).join(' / ')}
-function exportTeam(sets){return sets.map(s=>{const L=[];let head=s.species;if(s.nickname)head+=' ('+s.nickname+')';else if(s.gender)head+=' ('+s.gender+')';if(s.item)head+=' @ '+s.item;L.push(head);if(s.shiny)L.push('Shiny: Yes');if(s.ability)L.push('Ability: '+s.ability);if(s.tera)L.push('Tera Type: '+(s.tera[0]?s.tera[0].toUpperCase()+s.tera.slice(1):s.tera));if(s.level&&s.level!==100)L.push('Level: '+s.level);const ev=fmtStats(s.evs);if(ev)L.push('EVs: '+ev);const iv=fmtStats(s.ivs);if(iv)L.push('IVs: '+iv);if(s.nature)L.push(s.nature+' Nature');for(const mv of s.moves)if(mv)L.push('- '+mv);return L.join('\n')}).join('\n\n')+'\n'}function evTotal(s){return STATS.reduce((a,k)=>a+((s.evs&&s.evs[k])||0),0)}
-/* escribe un EV respetando 252/stat y 510 por Pokémon; devuelve el valor aplicado */
+function fmtStats(o){
+  const lbl={hp:'HP',atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};
+  return STATS.filter(k=>o&&o[k]).map(k=>o[k]+' '+lbl[k]).join(' / ');
+}
+function exportTeam(sets){
+  return sets.map(s=>{
+    const L=[];
+    let head=s.species;
+    if(s.nickname)head+=' ('+s.nickname+')';
+    else if(s.gender)head+=' ('+s.gender+')';
+    if(s.item)head+=' @ '+s.item;
+    L.push(head);
+    if(s.ability)L.push('Ability: '+s.ability);
+    if(s.shiny)L.push('Shiny: Yes');
+    if(s.tera)L.push('Tera Type: '+(s.tera[0]?s.tera[0].toUpperCase()+s.tera.slice(1):s.tera));
+    if(s.level&&s.level!==100)L.push('Level: '+s.level);
+    const ev=fmtStats(s.evs);
+    if(ev)L.push('EVs: '+ev);
+    const iv=fmtStats(s.ivs);
+    if(iv)L.push('IVs: '+iv);
+    if(s.nature)L.push(s.nature+' Nature');
+    for(const mv of (s.moves||[]))if(mv)L.push('- '+mv);
+    return L.join('\n');
+  }).join('\n\n')+'\n';
+}
+function evTotal(s){return STATS.reduce((a,k)=>a+((s.evs&&s.evs[k])||0),0)}
 function setEV(s,key,val){
+  if(!s.evs)s.evs={};
   val=Math.max(0,Math.min(252,val|0));
   const others=STATS.reduce((a,k)=>a+((k===key)?0:(s.evs[k]||0)),0);
   val=Math.min(val,Math.max(0,510-others));
-  s.evs[key]=val;return val;
+  s.evs[key]=val;
+  return val;
 }
 
 /* ================= ANÁLISIS ================= */
 const moveTypeCache={};
 function guessMoveType(mv,types){const l=mv.toLowerCase();for(const t of types)if(l.includes(t))return t;return types[0]||'normal'}
-function roleOf(s){const mv=(s.moves||[]).join(' ').toLowerCase();const sp=(s.evs&&s.evs.spe)||0;const bulk=(s.stats?((s.stats.hp||0)+(s.stats.def||0)+(s.stats.spd||0)):0);if(/stealth rock|spikes|toxicspikes|sticky web|tailwind|reflect|lightscreen|wish|memento/.test(mv))return{role:'Soporte',icon:'🛡️'};if(/swords dance|dragon dance|calm mind|nasty plot|shell smash|quiver dance|curse/.test(mv))return{role:'Setup Sweeper',icon:'⚔️'};if(/uturn|volt switch|flip turn|parting shot|baton pass/.test(mv))return{role:'Pivot',icon:'🔄'};if(/recover|roost|slack off|rest|moonlight|synthesis|shore up|wish/.test(mv)&&bulk>240)return{role:'Wall',icon:'🧱'};if(sp>=200)return{role:'Fast Sweeper',icon:'⚡'};if(/earthquake|close combat|flamethrower|hydropump|ice beam|thunderbolt|choice/.test(mv))return{role:'Atacante',icon:'🎯'};return{role:'Equilibrado',icon:'🧩'}}
-function bestCounters(mine,enemy,dex){return mine.map(m=>{const mt=(dex[m.species]&&dex[m.species].types)||[];let best=null,bs=-1;for(const e of enemy){const et=(dex[e.species]&&dex[e.species].types)||[];if(!et.length)continue;const off=Math.max(1,...(e.moves||[]).map(mv=>eff([moveTypeCache[mv]||guessMoveType(mv,et)],mt)));const def=eff(mt,et)||1;const sc=off/def;if(sc>bs){bs=sc;best=e}}return{mon:m,counter:best}})}
-function teamSummary(sets,dex){const types={};let atk=0,def=0,spd=0,spe=0,hp=0;sets.forEach(s=>{const d=dex[s.species]||{};(d.types||[]).forEach(t=>types[t]=(types[t]||0)+1);const st=d.stats||{};atk+=st.atk||0;def+=st.def||0;spd+=st.spd||0;spe+=st.spe||0;hp+=st.hp||0});const sorted=Object.entries(types).sort((a,b)=>b[1]-a[1]);return{main:sorted.slice(0,3).map(e=>e[0]),avg:{atk:Math.round(atk/Math.max(1,sets.length)),def:Math.round(def/Math.max(1,sets.length)),spd:Math.round(spd/Math.max(1,sets.length)),spe:Math.round(spe/Math.max(1,sets.length)),hp:Math.round(hp/Math.max(1,sets.length))}}}
+function roleOf(s){
+  const mv=(s.moves||[]).join(' ').toLowerCase();
+  const sp=(s.evs&&s.evs.spe)||0;
+  const bulk=(s.stats?((s.stats.hp||0)+(s.stats.def||0)+(s.stats.spd||0)):0);
+  if(/stealth rock|spikes|toxicspikes|sticky web|tailwind|reflect|lightscreen|wish|memento/.test(mv))return{role:'Soporte',icon:'🛡️'};
+  if(/swords dance|dragon dance|calm mind|nasty plot|shell smash|quiver dance|curse/.test(mv))return{role:'Setup Sweeper',icon:'⚔️'};
+  if(/uturn|volt switch|flip turn|parting shot|baton pass/.test(mv))return{role:'Pivot',icon:'🔄'};
+  if(/recover|roost|slack off|rest|moonlight|synthesis|shore up|wish/.test(mv)&&bulk>240)return{role:'Wall',icon:'🧱'};
+  if(sp>=200)return{role:'Fast Sweeper',icon:'⚡'};
+  if(/earthquake|close combat|flamethrower|hydropump|ice beam|thunderbolt|choice/.test(mv))return{role:'Atacante',icon:'🎯'};
+  return{role:'Equilibrado',icon:'🧩'};
+}
+function bestCounters(mine,enemy,dex){
+  return mine.map(m=>{
+    const mt=(dex[m.species]&&dex[m.species].types)||[];
+    let best=null,bs=-1;
+    for(const e of enemy){
+      const et=(dex[e.species]&&dex[e.species].types)||[];
+      if(!et.length)continue;
+      const off=Math.max(1,...(e.moves||[]).map(mv=>eff([moveTypeCache[mv]||guessMoveType(mv,et)],mt)));
+      const def=eff(mt,et)||1;
+      const sc=off/def;
+      if(sc>bs){bs=sc;best=e}
+    }
+    return{mon:m,counter:best};
+  });
+}
+function teamSummary(sets,dex){
+  const types={};
+  let atk=0,def=0,spd=0,spe=0,hp=0;
+  sets.forEach(s=>{
+    const d=dex[s.species]||{};
+    (d.types||[]).forEach(t=>types[t]=(types[t]||0)+1);
+    const st=d.stats||{};
+    atk+=st.atk||0;def+=st.def||0;spd+=st.spd||0;spe+=st.spe||0;hp+=st.hp||0;
+  });
+  const sorted=Object.entries(types).sort((a,b)=>b[1]-a[1]);
+  return{
+    main:sorted.slice(0,3).map(e=>e[0]),
+    avg:{
+      atk:Math.round(atk/Math.max(1,sets.length)),
+      def:Math.round(def/Math.max(1,sets.length)),
+      spd:Math.round(spd/Math.max(1,sets.length)),
+      spe:Math.round(spe/Math.max(1,sets.length)),
+      hp:Math.round(hp/Math.max(1,sets.length))
+    }
+  };
+}
 
 /* ================= STORE ================= */
 const Store=(()=>{
-  const LS='cpaste.rooms.v1';let mode=localStorage.getItem('cpaste.mode')||'local';let relayUrl=localStorage.getItem('cpaste.relay')||'';
-  const bc=('BroadcastChannel'in window)?new BroadcastChannel('cpaste'):null;const L=new Set();const emit=()=>L.forEach(f=>f());const on=f=>{L.add(f);return()=>L.delete(f)};
-  const rooms=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){return{}}};const save=r=>localStorage.setItem(LS,JSON.stringify(r));
+  const LS='cpaste.rooms.v1';
+  let mode=localStorage.getItem('cpaste.mode')||'local';
+  let relayUrl=localStorage.getItem('cpaste.relay')||'';
+  const bc=('BroadcastChannel'in window)?new BroadcastChannel('cpaste'):null;
+  const L=new Set();
+  const emit=()=>L.forEach(f=>f());
+  const on=f=>{L.add(f);return()=>L.delete(f)};
+  const rooms=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){return{}}};
+  const save=r=>localStorage.setItem(LS,JSON.stringify(r));
   const rid=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<8;i++)s+=c[Math.floor(Math.random()*c.length)];return s.slice(0,4)+'-'+s.slice(4)};
   const sec=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return[...a].map(x=>x.toString(16).padStart(2,'0')).join('')};
-  function lCreate(team,name){const id=rid();const r=rooms();r[id]={id,host:{secret:sec(),name:name||'Anfitrión',team},guest:null,createdAt:Date.now()};save(r);bc&&bc.postMessage(id);return{id,secret:r[id].host.secret,role:'host'}}
-  function lJoin(id){const r=rooms();const room=r[id];if(!room)throw new Error('No existe esa sala en ESTE navegador (modo Local = misma ventana, 2 pestañas). Para jugar entre dispositivos, activa Relay en Ajustes.');if(room.guest)throw new Error('La sala ya tiene un rival.');room.guest={secret:sec(),team:null,name:'Rival'};save(r);bc&&bc.postMessage(id);return{id,secret:room.guest.secret,role:'guest'}}
-  function lSubmit(id,sk,team,name){const r=rooms();const room=r[id];if(!room)throw new Error('Sala no encontrada');const slot=room.host.secret===sk?'host':(room.guest&&room.guest.secret===sk?'guest':null);if(!slot)throw new Error('Credencial incorrecta');room[slot]={...room[slot],team,name:name||room[slot].name};save(r);bc&&bc.postMessage(id);return true}
-  function lPeek(id,sk){const room=rooms()[id];if(!room)throw new Error('Sala no encontrada');const me=room.host.secret===sk?'host':'guest';const other=me==='host'?'guest':'host';const mine=room[me]?room[me].team:null;const both=mine&&room[other]&&room[other].team;return{status:!room[other]?'waiting':(both?'revealed':'pending'),you:mine,youName:room[me]&&room[me].name,them:both?room[other].team:null,themName:room[other]&&room[other].name,role:me}}
-  async function rel(p,b){const r=await fetch(relayUrl.replace(/\/$/,'')+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j}
-  window.addEventListener('storage',e=>{if(e.key===LS)emit()});bc&&(bc.onmessage=()=>emit());
-  return{get mode(){return mode},set mode(v){mode=v;localStorage.setItem('cpaste.mode',v);emit()},get relayUrl(){return relayUrl},set relayUrl(v){relayUrl=v;localStorage.setItem('cpaste.relay',v)},on,emit,rid,
-create:(t,n)=>mode==='relay'?rel('/api/create',{team:t,name:n}).then(j=>({id:j.id,secret:j.secret,role:'host'})):lCreate(t,n),    join:(id)=>mode==='relay'?rel('/api/join',{id}).then(j=>({id,secret:j.secret,role:'guest'})):lJoin(id),
+  function lCreate(team,name){
+    const id=rid();
+    const r=rooms();
+    r[id]={id,host:{secret:sec(),name:name||'Anfitrión',team},guest:null,createdAt:Date.now()};
+    save(r);
+    bc&&bc.postMessage(id);
+    return{id,secret:r[id].host.secret,role:'host'};
+  }
+  function lJoin(id){
+    const r=rooms();
+    const room=r[id];
+    if(!room)throw new Error('No existe esa sala en ESTE navegador (modo Local = misma ventana, 2 pestañas). Para jugar entre dispositivos, activa Relay en Ajustes.');
+    if(room.guest)throw new Error('La sala ya tiene un rival.');
+    room.guest={secret:sec(),team:null,name:'Rival'};
+    save(r);
+    bc&&bc.postMessage(id);
+    return{id,secret:room.guest.secret,role:'guest'};
+  }
+  function lSubmit(id,sk,team,name){
+    const r=rooms();
+    const room=r[id];
+    if(!room)throw new Error('Sala no encontrada');
+    const slot=room.host.secret===sk?'host':(room.guest&&room.guest.secret===sk?'guest':null);
+    if(!slot)throw new Error('Credencial incorrecta');
+    room[slot]={...room[slot],team,name:name||room[slot].name};
+    save(r);
+    bc&&bc.postMessage(id);
+    return true;
+  }
+  function lPeek(id,sk){
+    const room=rooms()[id];
+    if(!room)throw new Error('Sala no encontrada');
+    const me=room.host.secret===sk?'host':'guest';
+    const other=me==='host'?'guest':'host';
+    const mine=room[me]?room[me].team:null;
+    const both=mine&&room[other]&&room[other].team;
+    return{
+      status:!room[other]?'waiting':(both?'revealed':'pending'),
+      you:mine,
+      youName:room[me]&&room[me].name,
+      them:both?room[other].team:null,
+      themName:room[other]&&room[other].name,
+      role:me
+    };
+  }
+  async function rel(p,b){
+    const r=await fetch(relayUrl.replace(/\/$/,'')+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
+    return j;
+  }
+  window.addEventListener('storage',e=>{if(e.key===LS)emit()});
+  bc&&(bc.onmessage=()=>emit());
+  return{
+    get mode(){return mode},
+    set mode(v){mode=v;localStorage.setItem('cpaste.mode',v);emit()},
+    get relayUrl(){return relayUrl},
+    set relayUrl(v){relayUrl=v;localStorage.setItem('cpaste.relay',v)},
+    on,emit,rid,
+    create:(t,n)=>mode==='relay'?rel('/api/create',{team:t,name:n}).then(j=>({id:j.id,secret:j.secret,role:'host'})):lCreate(t,n),
+    join:(id)=>mode==='relay'?rel('/api/join',{id}).then(j=>({id,secret:j.secret,role:'guest'})):lJoin(id),
     submit:(id,sk,t,n)=>mode==='relay'?rel('/api/submit',{id,secret:sk,team:t,name:n}):lSubmit(id,sk,t,n),
     peek:(id,sk)=>mode==='relay'?rel('/api/peek',{id,secret:sk}):lPeek(id,sk),
-    myRooms:()=>mode==='relay'?[]:Object.values(rooms()),forget(id){const r=rooms();delete r[id];save(r);emit()}};
+    myRooms:()=>mode==='relay'?[]:Object.values(rooms()),
+    forget(id){const r=rooms();delete r[id];save(r);emit()}
+  };
 })();
 
 /* ================= UI ================= */
-function h(html){const t=document.createElement('template');t.innerHTML=html.trim();const k=[...t.content.children];if(k.length===1)return k[0];const d=document.createElement('div');k.forEach(x=>d.appendChild(x));return d}function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
-function toast(msg,type){const el=h('<div class="toast '+(type||'')+'">'+esc(msg)+'</div>');document.getElementById('toasts').appendChild(el);setTimeout(()=>{el.style.transition='.3s';el.style.opacity=0;el.style.transform='translateX(40px)';setTimeout(()=>el.remove(),320)},2600)}
-function modal(title,body,onOpen){const back=h('<div class="modal-back"><div class="modal"><h3>'+esc(title)+'</h3><div class="m-body"></div></div></div>');back.querySelector('.m-body').appendChild(typeof body==='string'?h('<div>'+body+'</div>'):body);document.getElementById('modal-root').appendChild(back);back.addEventListener('click',e=>{if(e.target===back)back.remove()});onOpen&&onOpen(back);return back}
+function h(html){
+  const t=document.createElement('template');
+  t.innerHTML=html.trim();
+  const k=[...t.content.children];
+  if(k.length===1)return k[0];
+  const d=document.createElement('div');
+  k.forEach(x=>d.appendChild(x));
+  return d;
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function toast(msg,type){
+  const el=h('<div class="toast '+(type||'')+'">'+esc(msg)+'</div>');
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>{
+    el.style.transition='.3s';
+    el.style.opacity=0;
+    el.style.transform='translateX(40px)';
+    setTimeout(()=>el.remove(),320);
+  },2600);
+}
+function modal(title,body,onOpen){
+  const back=h('<div class="modal-back"><div class="modal"><h3>'+esc(title)+'</h3><div class="m-body"></div></div></div>');
+  back.querySelector('.m-body').appendChild(typeof body==='string'?h('<div>'+body+'</div>'):body);
+  document.getElementById('modal-root').appendChild(back);
+  back.addEventListener('click',e=>{if(e.target===back)back.remove()});
+  onOpen&&onOpen(back);
+  return back;
+}
 function typeChip(t){return '<span class="chip" style="background:'+typeColor(t)+'">'+esc(typeES(t))+'</span>'}
 function miniType(t){return '<span class="mini-type" style="background:'+typeColor(t)+'">'+esc(t)+'</span>'}
-function spr(n,f,style,sh){n=String(n||'').trim();if(!n)return '';const main=spriteShowdown(n,f,style||Settings.sprite,sh||Settings.shiny);const fb=spritePokeAPI(n,sh||Settings.shiny);return '<img loading="lazy" src="'+main+'" onerror="this.onerror=null;this.src=\''+fb+'\''+'" alt="'+esc(n)+'">'}
-function itemImg(n){if(!n)return '';return '<img loading="lazy" src="'+itemShowdown(n)+'" onerror="this.onerror=null;this.src=\''+itemPokeAPI(n)+'\''+'" alt="'+esc(n)+'">'}async function copy(t){try{await navigator.clipboard.writeText(t);toast('Copiado','ok')}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Copiado','ok')}}
-function clamp(n,a,b){return Math.max(a,Math.min(b,n))}
 
 /* ================= DEX ================= */
-const DexCache={pokemon:null,items:null,details:{}};
-async function loadPokemonIndex(){if(DexCache.pokemon)return DexCache.pokemon;const c=localStorage.getItem('cpaste.dex.p');if(c){DexCache.pokemon=JSON.parse(c);return DexCache.pokemon}const all=[];for(let off=0;off<1400;off+=200){const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=200&offset='+off).then(x=>x.json()).catch(()=>({results:[]}));all.push(...(r.results||[]));if(!r.results||r.results.length<200)break}DexCache.pokemon=all.map((p,i)=>({name:p.name,id:i+1}));try{localStorage.setItem('cpaste.dex.p',JSON.stringify(DexCache.pokemon))}catch(e){}return DexCache.pokemon}
-async function loadItemIndex(){if(DexCache.items)return DexCache.items;const c=localStorage.getItem('cpaste.dex.i');if(c){DexCache.items=JSON.parse(c);return DexCache.items}const r=await fetch('https://pokeapi.co/api/v2/item?limit=1400').then(x=>x.json()).catch(()=>({results:[]}));DexCache.items=(r.results||[]).map(x=>x.name);try{localStorage.setItem('cpaste.dex.i',JSON.stringify(DexCache.items))}catch(e){}return DexCache.items}
-async function getPokemonDetail(name){if(DexCache.details[name])return DexCache.details[name];const r=await fetch('https://pokeapi.co/api/v2/pokemon/'+slug(name)).then(x=>x.json()).catch(()=>null);if(!r)return null;const stats={};for(const s of r.stats)stats[normKey(s.stat.name)||s.stat.name]=s.base_stat;const types=r.types.sort((a,b)=>a.slot-b.slot).map(t=>t.type.name);const forms=(r.forms||[]).map(f=>f.name);const d={name:r.name,id:r.id,stats,types,forms};DexCache.details[name]=d;return d}
-function combo(ph,items,onPick,render){const wrap=h('<div class="combo"><div class="combo-face"><input type="text" placeholder="'+esc(ph)+'" autocomplete="off"></div><div class="combo-pop"></div></div>');const inp=wrap.querySelector('input'),pop=wrap.querySelector('.combo-pop');let list=[],idx=-1;const draw=()=>pop.innerHTML=list.map((it,i)=>'<div class="combo-op'+(i===idx?' sel':'')+'" data-i="'+i+'">'+render(it)+'</div>').join('');const fill=q=>{const qq=slug(q);list=items().filter(n=>qq.includes(slug(n))||slug(n).includes(qq)).slice(0,40);idx=-1;draw();pop.classList.toggle('on',list.length>0)};inp.addEventListener('focus',()=>fill(inp.value));inp.addEventListener('input',()=>fill(inp.value));inp.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){idx=Math.min(idx+1,list.length-1);draw();e.preventDefault()}else if(e.key==='ArrowUp'){idx=Math.max(idx-1,0);draw();e.preventDefault()}else if(e.key==='Enter'&&idx>=0){onPick(list[idx]);pop.classList.remove('on');e.preventDefault()}else if(e.key==='Escape')pop.classList.remove('on')});pop.addEventListener('mousedown',e=>{const op=e.target.closest('.combo-op');if(op){onPick(list[+op.dataset.i]);pop.classList.remove('on')}});document.addEventListener('click',e=>{if(!wrap.contains(e.target))pop.classList.remove('on')});return{el:wrap,input:inp}}
+async function loadPokemonIndex(){
+  if(DexCache.pokemon)return DexCache.pokemon;
+  const c=localStorage.getItem('cpaste.dex.p');
+  if(c){try{DexCache.pokemon=JSON.parse(c);return DexCache.pokemon}catch(e){}}
+  const all=[];
+  for(let off=0;off<1400;off+=200){
+    const r=await fetch('https://pokeapi.co/api/v2/pokemon?limit=200&offset='+off).then(x=>x.json()).catch(()=>({results:[]}));
+    all.push(...(r.results||[]));
+    if(!r.results||r.results.length<200)break;
+  }
+  DexCache.pokemon=all.map((p,i)=>({name:p.name,id:i+1}));
+  try{localStorage.setItem('cpaste.dex.p',JSON.stringify(DexCache.pokemon))}catch(e){}
+  return DexCache.pokemon;
+}
+async function loadItemIndex(){
+  if(DexCache.items)return DexCache.items;
+  const c=localStorage.getItem('cpaste.dex.i');
+  if(c){try{DexCache.items=JSON.parse(c);return DexCache.items}catch(e){}}
+  const r=await fetch('https://pokeapi.co/api/v2/item?limit=1400').then(x=>x.json()).catch(()=>({results:[]}));
+  DexCache.items=(r.results||[]).map(x=>x.name);
+  try{localStorage.setItem('cpaste.dex.i',JSON.stringify(DexCache.items))}catch(e){}
+  return DexCache.items;
+}
+function detailCandidates(name){
+  const out=[];
+  const add=x=>{x=String(x||'').trim();if(x&&!out.includes(x))out.push(x)};
+  add(name);
+  const sl=slug(name);
+  add(sl);
+  const nos=sl.replace(/-/g,'');
+  if(nos)add(nos);
+  const parts=sl.split('-');
+  if(parts.length>1){
+    const base=parts[0], suffix=parts.slice(1).join('-');
+    add(base+'-'+suffix);
+    if(base==='ogerpon'&&!suffix.includes('mask'))add(base+'-'+suffix+'-mask');
+    add(base);
+  }
+  return out;
+}
+async function getPokemonDetail(name){
+  if(DexCache.details[name])return DexCache.details[name];
+  const cands=detailCandidates(name);
+  let data=null;
+  for(const c of cands){
+    const r=await fetch('https://pokeapi.co/api/v2/pokemon/'+encodeURIComponent(slug(c))).then(x=>x.ok?x.json():null).catch(()=>null);
+    if(r&&Array.isArray(r.stats)&&r.stats.length){data=r;break}
+  }
+  if(!data)return null;
+  const stats={};
+  for(const s of data.stats)stats[normKey(s.stat.name)||s.stat.name]=s.base_stat;
+  const types=(data.types||[]).sort((a,b)=>a.slot-b.slot).map(t=>t.type.name);
+  const forms=(data.forms||[]).map(f=>f.name);
+  const d={name:data.name,id:data.id,stats,types,forms};
+  DexCache.details[name]=d;
+  if(data.name&&data.name!==name)DexCache.details[data.name]=d;
+  return d;
+}
+function combo(ph,items,onPick,render){
+  const wrap=h('<div class="combo"><div class="combo-face"><input type="text" placeholder="'+esc(ph)+'" autocomplete="off"></div><div class="combo-pop"></div></div>');
+  const inp=wrap.querySelector('input'),pop=wrap.querySelector('.combo-pop');
+  let list=[],idx=-1;
+  const draw=()=>pop.innerHTML=list.map((it,i)=>'<div class="combo-op'+(i===idx?' sel':'')+'" data-i="'+i+'">'+render(it)+'</div>').join('');
+  const fill=q=>{
+    const qq=slug(q);
+    list=items().filter(n=>qq.includes(slug(n))||slug(n).includes(qq)).slice(0,40);
+    idx=-1;
+    draw();
+    pop.classList.toggle('on',list.length>0);
+  };
+  inp.addEventListener('focus',()=>fill(inp.value));
+  inp.addEventListener('input',()=>fill(inp.value));
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='ArrowDown'){idx=Math.min(idx+1,list.length-1);draw();e.preventDefault()}
+    else if(e.key==='ArrowUp'){idx=Math.max(idx-1,0);draw();e.preventDefault()}
+    else if(e.key==='Enter'&&idx>=0){onPick(list[idx]);pop.classList.remove('on');e.preventDefault()}
+    else if(e.key==='Escape')pop.classList.remove('on');
+  });
+  pop.addEventListener('mousedown',e=>{
+    const op=e.target.closest('.combo-op');
+    if(op){onPick(list[+op.dataset.i]);pop.classList.remove('on')}
+  });
+  document.addEventListener('click',e=>{if(!wrap.contains(e.target))pop.classList.remove('on')});
+  return{el:wrap,input:inp};
+}
 
 /* ================= APP ================= */
-let sets=[];let room=null;let pollTimer=null;let dexIndexCache={};
+let sets=[];
+let room=null;
+let pollTimer=null;
 const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,salas:viewRooms,ajustes:viewSettings,sala:renderRoomView};
-function nav(){const hash=(location.hash||'#/inicio').replace('#/','');const[name,...rest]=hash.split('/');document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));const fn=routes[name]||viewHome;document.getElementById('app').innerHTML='';fn(rest);window.scrollTo(0,0)}
+function nav(){
+  const hash=(location.hash||'#/inicio').replace('#/','');
+  const[name,...rest]=hash.split('/');
+  document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
+  document.getElementById('app').innerHTML='';
+  const fn=routes[name]||viewHome;
+  fn(rest);
+  window.scrollTo(0,0);
+}
 window.addEventListener('hashchange',()=>{stopPoll();nav()});
 Store.on(()=>{if(room)refreshRoom()});
-window.addEventListener('DOMContentLoaded',()=>{nav();startBg();document.getElementById('quickjoin').addEventListener('submit',e=>{e.preventDefault();const v=document.getElementById('quickjoin-input').value.trim();if(v)joinRoom(v)})});
-function joinRoom(code){(async()=>{try{const r=await Store.join(code);room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[]};location.hash='#/sala/'+code}catch(e){toast(e.message,'bad')}})()}
+window.addEventListener('DOMContentLoaded',()=>{
+  nav();
+  startBg();
+  document.getElementById('quickjoin').addEventListener('submit',e=>{
+    e.preventDefault();
+    const v=document.getElementById('quickjoin-input').value.trim();
+    if(v)joinRoom(v);
+  });
+});
+function joinRoom(code){
+  (async()=>{
+    try{
+      const r=await Store.join(code);
+      room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[]};
+      location.hash='#/sala/'+code;
+    }catch(e){
+      toast(e.message,'bad');
+    }
+  })();
+}
 
-function viewHome(){const app=document.getElementById('app');
+function viewHome(){
+  const app=document.getElementById('app');
   app.appendChild(h('<section class="hero"><div class="hero-side you"><span class="hero-tag">◉ Tú · siempre visible</span><h2 class="hero-h">Sube tu equipo<br>a ciegas.</h2><p class="hero-p">Construye tu equipo con sprites reales, estilo pokepaste. Nadie lo verá… hasta que el rival suba el suyo.</p><div class="term"><div class="term-bar"><i></i><i></i><i></i></div><div class="raw-paste">Garchomp @ Choice Scarf\nAbility: Rough Skin\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Stone Edge\n- Swords Dance<span class="caret"></span></div></div><div class="hero-actions"><button class="btn btn-primary btn-lg" data-act="create">➕ Crear sala y publicar</button><a class="btn btn-ghost btn-lg" href="#/unirse">🔗 Unirme con código</a><a class="btn btn-ghost" href="#/dex">📖 Pokédex</a></div></div><div class="hero-side them"><span class="hero-tag">◈ Rival · bloqueado</span><div class="locked"><div class="padlock">🔒</div><h3>Sin acceso hasta el intercambio</h3><p>El equipo rival se revelará cuando ambos lo hayáis enviado.</p><div class="ghost-slots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div></section>'));
   app.appendChild(h('<div class="strip"><div><b>1025+</b><span>Pokémon</span></div><div><b>~2500</b><span>objetos</span></div><div><b>5</b><span>estilos sprite</span></div><div><b>100%</b><span>formato Showdown</span></div><div><b id="stat-rooms">0</b><span>tus salas</span></div></div>'));
   app.appendChild(h('<h2 class="section-title">Cómo funciona</h2><div class="steps">'+[['1','Crear sala','Pulsa <span class="k">Crear sala</span>. Tu equipo queda sellado y se genera un <b>código corto</b>.'],['2','Pasar el código','Dale al rival el código. No puede ver nada todavía.'],['3','El rival se une','Introduce el código en <span class="k">Unirse</span> y sube su equipo.'],['4','Revelación mutua','En cuanto ambos enviáis, los equipos aparecen lado a lado con <b>análisis y counters</b>.']].map(x=>'<div class="step"><div class="step-n">'+x[0]+'</div><div><h3>'+x[1]+'</h3><p>'+x[2]+'</p></div></div>').join('')+'</div>'));
   app.querySelector('[data-act=create]').onclick=()=>{location.hash='#/constructor';setTimeout(()=>doCreate(true),80)};
-  const sr=document.getElementById('stat-rooms');if(sr)sr.textContent=Store.myRooms().length;
+  const sr=document.getElementById('stat-rooms');
+  if(sr)sr.textContent=Store.myRooms().length;
 }
 
-function viewBuilder(){const app=document.getElementById('app');
+function viewBuilder(){
+  const app=document.getElementById('app');
   const tb=h('<div class="builder-top">'+(room?'<span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span>':'<span class="badge badge-host">Borrador</span>')+'<div class="seg" id="segsize">'+[1,2,3,4,5,6].map(n=>'<button data-n="'+n+'" class="'+(Settings.size===n?'on':'')+'">'+n+'</button>').join('')+'</div><button class="btn btn-sm" id="btn-import">📥 Pegar paste</button><button class="btn btn-sm" id="btn-export">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="btn-clear">🗑 Limpiar</button>'+(room?'<button class="btn btn-sm btn-gold" id="btn-share">🔗 Compartir</button>':'')+'<span class="evbudget" id="evb"></span><button class="btn btn-primary" id="btn-publish">'+(room?(room.role==='host'?'↻ Actualizar':'🔓 Enviar y desbloquear'):'➕ Crear sala y publicar')+'</button></div>');
-  app.appendChild(tb);if(room)app.appendChild(h('<div class="card" style="margin:14px 0;text-align:center"><div style="font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase">Código de sala · pásalo al rival</div><div class="code-box" style="margin:10px 0">'+room.id+'</div><button class="btn btn-sm" id="cpc">📋 Copiar código</button></div>'));const wb=h('<div class="workbench"><div class="slots" id="slots"></div><aside class="preview" id="preview"></aside></div>');app.appendChild(wb);
-  tb.querySelector('#segsize').onclick=e=>{const b=e.target.closest('button');if(!b)return;Settings.size=+b.dataset.n;saveSettings();tb.querySelectorAll('#segsize button').forEach(x=>x.classList.toggle('on',+x.dataset.n===Settings.size));renderSlots()};
-  tb.querySelector('#btn-import').onclick=openImport;tb.querySelector('#btn-export').onclick=()=>copy(exportTeam(sets.filter(s=>s.species)));tb.querySelector('#btn-clear').onclick=()=>{sets=sets.map(()=>({}));renderSlots();renderPreview()};tb.querySelector('#btn-publish').onclick=onPublish;const sh=tb.querySelector('#btn-share');if(sh)sh.onclick=shareCode;
-  renderSlots();renderPreview();
+  app.appendChild(tb);
+  if(room)app.appendChild(h('<div class="card" style="margin:14px 0;text-align:center"><div style="font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase">Código de sala · pásalo al rival</div><div class="code-box" style="margin:10px 0">'+room.id+'</div><button class="btn btn-sm" id="cpc">📋 Copiar código</button></div>'));
+  const wb=h('<div class="workbench"><div class="slots" id="slots"></div><aside class="preview" id="preview"></aside></div>');
+  app.appendChild(wb);
+  tb.querySelector('#segsize').onclick=e=>{
+    const b=e.target.closest('button');
+    if(!b)return;
+    Settings.size=+b.dataset.n;
+    saveSettings();
+    tb.querySelectorAll('#segsize button').forEach(x=>x.classList.toggle('on',+x.dataset.n===Settings.size));
+    renderSlots();
+  };
+  tb.querySelector('#btn-import').onclick=openImport;
+  tb.querySelector('#btn-export').onclick=()=>copy(exportTeam(sets.filter(s=>s.species)));
+  tb.querySelector('#btn-clear').onclick=()=>{sets=sets.map(()=>({}));renderSlots();renderPreview()};
+  tb.querySelector('#btn-publish').onclick=onPublish;
+  const sh=tb.querySelector('#btn-share');
+  if(sh)sh.onclick=shareCode;
+  const cpc=document.getElementById('cpc');
+  if(cpc)cpc.onclick=()=>copy(room.id);
+  renderSlots();
+  renderPreview();
 }
 
-/* ---- panel de estadísticas por slot ---- */
 function statsPanelHTML(s){
   const d=dexIndexCache[s.species];
   if(!d)return '<div class="field"><label>Estadísticas</label><div class="stats-load">cargando datos…</div></div>';
@@ -294,75 +720,505 @@ function statsPanelHTML(s){
   }).join('');
   return '<div class="field"><label>Estadísticas <span style="color:var(--dim)">base · final (Nv '+lvl+')</span></label><div class="statgrid">'+rows+'</div></div>';
 }
-function syncStatFinal(el,s,k){const d=dexIndexCache[s.species];if(!d)return;const sf=el.querySelector('[data-sf="'+k+'"]');if(sf){const iv=(s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31;const ev=(s.evs&&s.evs[k])||0;sf.textContent=finalStat(d.stats[k]||0,k,iv,ev,s.nature,s.level||100)}}
+function syncStatFinal(el,s,k){
+  const d=dexIndexCache[s.species];
+  if(!d)return;
+  const sf=el.querySelector('[data-sf="'+k+'"]');
+  if(sf){
+    const iv=(s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31;
+    const ev=(s.evs&&s.evs[k])||0;
+    sf.textContent=finalStat(d.stats[k]||0,k,iv,ev,s.nature,s.level||100);
+  }
+}
 function syncEvUI(el,s,k){
   const v=s.evs[k]||0;
-  const inp=el.querySelector('[data-ev="'+k+'"]');if(inp)inp.value=v;
-  const bar=el.querySelector('[data-evbar="'+k+'"]');if(bar){bar.querySelector('i').style.width=Math.min(100,v/252*100)+'%';bar.classList.toggle('max',v>=252)}
+  const inp=el.querySelector('[data-ev="'+k+'"]');
+  if(inp)inp.value=v;
+  const bar=el.querySelector('[data-evbar="'+k+'"]');
+  if(bar){
+    bar.querySelector('i').style.width=Math.min(100,v/252*100)+'%';
+    bar.classList.toggle('max',v>=252);
+  }
   syncStatFinal(el,s,k);
-const left=el.querySelector('[data-evleft]');if(left){const r=Math.floor((510-evTotal(s))/4)*4;left.textContent='Restante: '+r;left.style.color=r<=0?'var(--warn)':'var(--ok)'}}
-function updateEvTotal(){const el=document.getElementById('evb');if(!el)return;const tot=sets.reduce((a,s)=>a+evTotal(s),0);const cap=510*Settings.size;el.innerHTML='EVs equipo: <b>'+tot+'</b>/'+cap;el.classList.toggle('over',tot>cap)}
-function dragEv(e,bar,set,el){const k=bar.dataset.evbar;const move=ev=>{const r=bar.getBoundingClientRect();setEV(set,k,Math.round((ev.clientX-r.left)/r.width*252));syncEvUI(el,set,k);updateEvTotal()};const up=()=>{document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up)};move(e);document.addEventListener('mousemove',move);document.addEventListener('mouseup',up)}
-
+  const left=el.querySelector('[data-evleft]');
+  if(left){
+    const r=Math.floor((510-evTotal(s))/4)*4;
+    left.textContent='Restante: '+r;
+    left.style.color=r<=0?'var(--warn)':'var(--ok)';
+  }
+}
+function updateEvTotal(){
+  const el=document.getElementById('evb');
+  if(!el)return;
+  const tot=sets.reduce((a,s)=>a+evTotal(s),0);
+  const cap=510*Settings.size;
+  el.innerHTML='EVs equipo: <b>'+tot+'</b>/'+cap;
+  el.classList.toggle('over',tot>cap);
+}
+function dragEv(e,bar,set,el){
+  const k=bar.dataset.evbar;
+  const move=ev=>{
+    const r=bar.getBoundingClientRect();
+    setEV(set,k,Math.round((ev.clientX-r.left)/r.width*252));
+    syncEvUI(el,set,k);
+    updateEvTotal();
+  };
+  const up=()=>{
+    document.removeEventListener('mousemove',move);
+    document.removeEventListener('mouseup',up);
+  };
+  move(e);
+  document.addEventListener('mousemove',move);
+  document.addEventListener('mouseup',up);
+}
 function slotHTML(s,i){
-  if(!s.species)return '<div class="slot" data-slot="'+i+'"><div class="empty-add">Slot vacío<button class="btn btn-sm" data-add="'+i+'">➕ Añadir Pokémon</button></div></div>';
-  const d=dexIndexCache[s.species]||{};const types=d.types||[];const tc=typeColor(types[0]||'normal');const forms=(d.forms||[]).filter(f=>f!==s.species);
-  return '<div class="slot filled open" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Forma</label><select data-form><option value="">—</option>'+forms.map(f=>'<option '+(f===s.form?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></div><div class="field"><label>Naturaleza</label><select data-nat><option value="">—</option>'+NATURES.map(n=>'<option '+(s.nature===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><input type="text" data-ability value="'+esc(s.ability||'')+'"></div></div>'+statsPanelHTML(s)+'<div class="field"><label>EVs <span style="color:var(--dim)">(máx 510, 252 c/u)</span><span class="evleft" data-evleft>Restante: '+Math.floor((510-evTotal(s))/4)*4+'</span></label><div class="evgrid">'+STATS.map(k=>{const v=(s.evs&&s.evs[k])||0;const pct=Math.min(100,v/252*100);return '<span class="st">'+STAT_ES[k]+'</span><div class="evbar '+(v>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="evnum" data-ev="'+k+'" value="'+v+'">'}).join('')+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div><div class="field"><label>IVs</label><div class="ivrow">'+STATS.map(k=>'<div><label>'+STAT_ES[k]+'</label><input data-iv="'+k+'" value="'+((s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31)+'"></div>').join('')+'</div></div><div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<select data-mv="'+n+'"><option value="">— vacío —</option>'+(s.moves[n]?'<option selected>'+esc(s.moves[n])+'</option>':'')+'</select>').join('')+'</div><div class="qbtns"><button class="qbtn" data-addmv>➕ Movimiento</button></div></div></div></div>';
+  if(!s.species)return '<div class="slot empty-slot" data-slot="'+i+'"><div class="empty-add">Slot vacío<div data-combo="species"></div></div></div>';
+  const d=dexIndexCache[s.species]||{};
+  const types=d.types||[];
+  const tc=typeColor(types[0]||'normal');
+  const forms=(d.forms||[]).filter(f=>f!==s.species);
+  return '<div class="slot filled open" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Forma</label><select data-form><option value="">—</option>'+forms.map(f=>'<option '+(f===s.form?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></div><div class="field"><label>Naturaleza</label><select data-nat><option value="">—</option>'+NATURES.map(n=>'<option '+(s.nature===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><input type="text" data-ability value="'+esc(s.ability||'')+'"></div></div>'+statsPanelHTML(s)+'<div class="field"><label>EVs <span style="color:var(--dim)">(máx 510, 252 c/u)</span><span class="evleft" data-evleft>Restante: '+Math.floor((510-evTotal(s))/4)*4+'</span></label><div class="evgrid">'+STATS.map(k=>{const v=(s.evs&&s.evs[k])||0;const pct=Math.min(100,v/252*100);return '<span class="st">'+STAT_ES[k]+'</span><div class="evbar '+(v>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="evnum" data-ev="'+k+'" value="'+v+'">'}).join('')+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div><div class="field"><label>IVs</label><div class="ivrow">'+STATS.map(k=>'<div><label>'+STAT_ES[k]+'</label><input data-iv="'+k+'" value="'+((s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31)+'"></div>').join('')+'</div></div><div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<select data-mv="'+n+'"><option value="">— vacío —</option>'+(s.moves[n]?'<option selected>'+esc(s.moves[n])+'</option>':'')+'</select>').join('')+'</div><div class="qbtns"><button class="qbtn" data-addmv>➕ Movimiento</button></div></div></div></div>';
 }
-
-function renderSlots(){const box=document.getElementById('slots');if(!box)return;while(sets.length<Settings.size)sets.push({});sets.length=Settings.size;box.innerHTML=sets.map((s,i)=>slotHTML(s,i)).join('');
-  box.querySelectorAll('[data-slot]').forEach(el=>{const i=+el.dataset.slot;const s=sets[i];
-    el.querySelector('.slot-head').onclick=()=>el.classList.toggle('open');
-    const add=el.querySelector('[data-add]');if(add)add.onclick=()=>{sets[i]=blank();renderSlots();renderPreview()};
-    const del=el.querySelector('[data-del]');if(del)del.onclick=()=>{sets[i]={};renderSlots();renderPreview()};
-    const dup=el.querySelector('[data-dup]');if(dup)dup.onclick=()=>{sets[i]=JSON.parse(JSON.stringify(s));renderSlots();renderPreview()};
-    if(s.species){
-      const fs=el.querySelector('[data-form]');if(fs)fs.onchange=()=>{s.form=fs.value;renderSlots();renderPreview()};
-      const ns=el.querySelector('[data-nat]');if(ns)ns.onchange=()=>{s.nature=ns.value;renderSlots();renderPreview()};
-      const ab=el.querySelector('[data-ability]');if(ab)ab.oninput=()=>{s.ability=ab.value};
-      el.querySelectorAll('[data-ev]').forEach(inp=>{const k=inp.dataset.ev;inp.oninput=()=>{setEV(s,k,+inp.value);syncEvUI(el,s,k);updateEvTotal()};inp.onblur=()=>{renderSlots()}});
-      el.querySelectorAll('[data-evbar]').forEach(bar=>bar.onmousedown=e=>dragEv(e,bar,s,el));
-      el.querySelectorAll('[data-iv]').forEach(inp=>inp.oninput=()=>{s.ivs[inp.dataset.iv]=clamp(+inp.value||0,0,31);syncStatFinal(el,s,inp.dataset.iv)});
-      el.querySelectorAll('[data-mv]').forEach(sel=>sel.onchange=()=>{s.moves[+sel.dataset.mv]=sel.value;renderSlots();renderPreview()});
-      const am=el.querySelector('[data-addmv]');if(am)am.onclick=()=>{if(s.moves.length<4){s.moves.push('');renderSlots();renderPreview()}};
-el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{Object.keys(s.evs).forEach(k=>delete s.evs[k]);if(b.dataset.q==='252'){s.evs.atk=252;s.evs.spe=252;s.evs.def=4}renderSlots();renderPreview()});    }
+function renderSlots(){
+  const box=document.getElementById('slots');
+  if(!box)return;
+  while(sets.length<Settings.size)sets.push({});
+  sets.length=Settings.size;
+  for(let i=0;i<sets.length;i++){
+    const s=sets[i];
+    if(s && s.species && (!Array.isArray(s.moves)||!s.evs||!s.ivs)) sets[i]=Object.assign(blank(),s);
+  }
+  box.innerHTML=sets.map((s,i)=>slotHTML(s,i)).join('');
+  box.querySelectorAll('[data-slot]').forEach(el=>{
+    const i=+el.dataset.slot;
+    const s=sets[i];
+    const head=el.querySelector('.slot-head');
+    if(head)head.onclick=()=>el.classList.toggle('open');
+    if(!s.species)return;
+    const del=el.querySelector('[data-del]');
+    if(del)del.onclick=()=>{sets[i]={};renderSlots();renderPreview()};
+    const dup=el.querySelector('[data-dup]');
+    if(dup)dup.onclick=()=>{sets[i]=JSON.parse(JSON.stringify(s));renderSlots();renderPreview()};
+    const shb=el.querySelector('[data-shiny]');
+    if(shb)shb.onclick=()=>{s.shiny=!s.shiny;renderSlots();renderPreview()};
+    const fs=el.querySelector('[data-form]');
+    if(fs)fs.onchange=()=>{s.form=fs.value;renderSlots();renderPreview()};
+    const ns=el.querySelector('[data-nat]');
+    if(ns)ns.onchange=()=>{s.nature=ns.value;renderSlots();renderPreview()};
+    const ab=el.querySelector('[data-ability]');
+    if(ab)ab.oninput=()=>{s.ability=ab.value};
+    el.querySelectorAll('[data-ev]').forEach(inp=>{
+      const k=inp.dataset.ev;
+      inp.oninput=()=>{setEV(s,k,+inp.value);syncEvUI(el,s,k);updateEvTotal()};
+      inp.onblur=()=>{renderSlots()};
+    });
+    el.querySelectorAll('[data-evbar]').forEach(bar=>bar.onmousedown=e=>dragEv(e,bar,s,el));
+    el.querySelectorAll('[data-iv]').forEach(inp=>inp.oninput=()=>{s.ivs[inp.dataset.iv]=clamp(+inp.value||0,0,31);syncStatFinal(el,s,inp.dataset.iv)});
+    el.querySelectorAll('[data-mv]').forEach(sel=>sel.onchange=()=>{s.moves[+sel.dataset.mv]=sel.value;renderSlots();renderPreview()});
+    const am=el.querySelector('[data-addmv]');
+    if(am)am.onclick=()=>{if(s.moves.length<4){s.moves.push('');renderSlots();renderPreview()}};
+    el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{Object.keys(s.evs).forEach(k=>delete s.evs[k]);if(b.dataset.q==='252'){s.evs.atk=252;s.evs.spe=252;s.evs.def=4}renderSlots();renderPreview()});
   });
-  box.querySelectorAll('[data-combo=species]').forEach(el=>{const i=+el.closest('.slot').dataset.slot;el.innerHTML='';const cb=combo('Buscar Pokémon…',()=>DexCache.pokemon?DexCache.pokemon.map(p=>p.name):[],async name=>{sets[i].species=name;sets[i].form='';const d=await getPokemonDetail(name);if(d)dexIndexCache[name]=d;renderSlots();renderPreview()},name=>{const d=dexIndexCache[name];return '<span>'+esc(name)+'</span><span class="ty">'+(d?d.types.map(miniType).join(''):'')+'</span>'});el.appendChild(cb.el);cb.input.value=sets[i].species||'';loadPokemonIndex()});
-  box.querySelectorAll('[data-combo=item]').forEach(el=>{const i=+el.closest('.slot').dataset.slot;el.innerHTML='';const cb=combo('Buscar objeto…',()=>DexCache.items||[],name=>{sets[i].item=name;renderSlots();renderPreview()},name=>'<span>'+esc(name)+'</span>');el.appendChild(cb.el);cb.input.value=sets[i].item||'';loadItemIndex()});
+  box.querySelectorAll('[data-combo=species]').forEach(el=>{
+    const i=+el.closest('.slot').dataset.slot;
+    el.innerHTML='';
+    const cb=combo('Buscar Pokémon…',()=>DexCache.pokemon?DexCache.pokemon.map(p=>p.name):[],async name=>{
+      const cur=sets[i]||{};
+      const shiny=cur.shiny==null?Settings.shiny:cur.shiny;
+      sets[i]=Object.assign(blank(),cur,{species:name,form:'',shiny});
+      const d=await getPokemonDetail(name);
+      if(d)dexIndexCache[name]=d;
+      renderSlots();
+      renderPreview();
+    },name=>{
+      const d=dexIndexCache[name];
+      return '<span>'+esc(name)+'</span><span class="ty">'+(d?d.types.map(miniType).join(''):'')+'</span>';
+    });
+    el.appendChild(cb.el);
+    cb.input.value=(sets[i]&&sets[i].species)||'';
+    loadPokemonIndex();
+  });
+  box.querySelectorAll('[data-combo=item]').forEach(el=>{
+    const i=+el.closest('.slot').dataset.slot;
+    el.innerHTML='';
+    const cb=combo('Buscar objeto…',()=>DexCache.items||[],name=>{
+      sets[i].item=name;
+      renderSlots();
+      renderPreview();
+    },name=>'<span>'+esc(name)+'</span>');
+    el.appendChild(cb.el);
+    cb.input.value=(sets[i]&&sets[i].item)||'';
+    loadItemIndex();
+  });
   updateEvTotal();
-  sets.forEach((s,i)=>{if(s.species&&!dexIndexCache[s.species])getPokemonDetail(s.species).then(d=>{if(d){dexIndexCache[s.species]=d;const el=document.querySelector('[data-slot="'+i+'"]');if(el&&!el.contains(document.activeElement))renderSlots()}})});
+  sets.forEach((s,i)=>{
+    if(s.species&&!dexIndexCache[s.species])getPokemonDetail(s.species).then(d=>{
+      if(d){
+        dexIndexCache[s.species]=d;
+        const el=document.querySelector('[data-slot="'+i+'"]');
+        if(el&&!el.contains(document.activeElement))renderSlots();
+      }
+    });
+  });
 }
 
-function pasteRender(real){return '<div class="pp">'+real.map(s=>{const d=dexIndexCache[s.species]||{};const types=d.types||[];const tc=typeColor(types[0]||'normal');return '<div class="pp-set" style="--tc:'+tc+'"><div class="pp-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="pp-lines"><div class="ln-name">'+esc(s.species)+(s.nickname?' <span class="par">('+esc(s.nickname)+')</span>':s.gender?' <span class="par">('+s.gender+')</span>':'')+(s.item?' <span class="ln-item">@ '+esc(s.item)+'</span>':'')+'</div>'+(s.ability?'<div class="ln-ab">Ability: <b>'+esc(s.ability)+'</b></div>':'')+(s.tera?'<div class="ln-meta">Tera Type: '+esc(s.tera)+'</div>':'')+(s.level&&s.level!==100?'<div class="ln-meta">Level: '+s.level+'</div>':'')+(fmtStats(s.evs)?'<div class="ln-ev">EVs: <b>'+esc(fmtStats(s.evs))+'</b></div>':'')+(fmtStats(s.ivs)?'<div class="ln-iv">IVs: '+esc(fmtStats(s.ivs))+'</div>':'')+(s.nature?'<div class="ln-nat">'+esc(s.nature)+' Nature</div>':'')+(s.moves||[]).filter(Boolean).map(m=>'<div class="ln-mv">'+esc(m)+'<span class="dot" style="background:'+typeColor(guessMoveType(m,types))+'"></span></div>').join('')+'</div></div>'}).join('')+'</div>'}
-function renderPreview(){const box=document.getElementById('preview');if(!box)return;box.innerHTML='';const real=sets.filter(s=>s.species);const head=h('<div class="preview-h"><b>Vista previa · pokepaste</b><span style="flex:1"></span><button class="btn btn-sm" id="pv-copy">Copiar</button><button class="btn btn-sm btn-ghost" id="pv-dl">.txt</button></div><div class="preview-b"><div id="pv-body"></div></div>');box.appendChild(head);const body=box.querySelector('#pv-body');
-  if(!real.length){body.innerHTML='<p style="color:var(--dim)">Añade un Pokémon para ver la vista previa tipo pokepaste.</p>'}
-  else{body.innerHTML=pasteRender(real);const sum=teamSummary(real,dexIndexCache);const r0=roleOf(real[0]);body.appendChild(h('<div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap">'+sum.main.map(typeChip).join('')+'<span class="chip" style="background:#1e2c48;color:#cfe">'+r0.icon+' '+r0.role+'</span></div>'));body.appendChild(h('<div style="margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--muted)">Media: '+STATS.map(k=>STAT_ES[k]+' '+sum.avg[k]).join(' · ')+'</div>'));body.appendChild(h('<pre class="raw-paste" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px">'+esc(exportTeam(real))+'</pre>'))}
-  head.querySelector('#pv-copy').onclick=()=>copy(exportTeam(real));head.querySelector('#pv-dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([exportTeam(real)],{type:'text/plain'}));a.download='equipo.txt';a.click()};
+function pasteRender(real){
+  return '<div class="pp">'+real.map(s=>{
+    const d=dexIndexCache[s.species]||{};
+    const types=d.types||[];
+    const tc=typeColor(types[0]||'normal');
+    return '<div class="pp-set" style="--tc:'+tc+'"><div class="pp-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="pp-lines"><div class="ln-name">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+(s.nickname?' <span class="par">('+esc(s.nickname)+')</span>':s.gender?' <span class="par">('+s.gender+')</span>':'')+(s.item?' <span class="ln-item">@ '+esc(s.item)+'</span>':'')+'</div>'+(s.ability?'<div class="ln-ab">Ability: <b>'+esc(s.ability)+'</b></div>':'')+(s.tera?'<div class="ln-meta">Tera Type: '+esc(s.tera)+'</div>':'')+(s.level&&s.level!==100?'<div class="ln-meta">Level: '+s.level+'</div>':'')+(fmtStats(s.evs)?'<div class="ln-ev">EVs: <b>'+esc(fmtStats(s.evs))+'</b></div>':'')+(fmtStats(s.ivs)?'<div class="ln-iv">IVs: '+esc(fmtStats(s.ivs))+'</div>':'')+(s.nature?'<div class="ln-nat">'+esc(s.nature)+' Nature</div>':'')+(s.moves||[]).filter(Boolean).map(m=>'<div class="ln-mv">'+esc(m)+'<span class="dot" style="background:'+typeColor(guessMoveType(m,types))+'"></span></div>').join('')+'</div></div>';
+  }).join('')+'</div>';
 }
-function openImport(){const ta=h('<textarea placeholder="Pega aquí tu equipo (export de Showdown / pokepaste)…"></textarea>');modal('Importar paste',ta,back=>{back.querySelector('.modal').insertAdjacentHTML('beforeend','<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Cancelar</button><button class="btn btn-primary" data-ok>Importar</button></div>');back.querySelector('[data-x]').onclick=()=>back.remove();back.querySelector('[data-ok]').onclick=async()=>{const parsed=parseTeam(ta.value);if(!parsed.length){toast('No he entendido el paste','bad');return}sets=parsed.slice(0,Settings.size).map(s=>({...s,evs:s.evs||{},ivs:s.ivs||{},moves:s.moves||[]}));while(sets.length<Settings.size)sets.push({});for(const s of sets)if(s.species){const d=await getPokemonDetail(s.species);if(d)dexIndexCache[s.species]=d}back.remove();renderSlots();renderPreview();const cpc=document.getElementById('cpc');if(cpc)cpc.onclick=()=>copy(room.id);toast(parsed.length+' Pokémon importados','ok')}})}
+function renderPreview(){
+  const box=document.getElementById('preview');
+  if(!box)return;
+  box.innerHTML='';
+  const real=sets.filter(s=>s.species);
+  const head=h('<div class="preview-h"><b>Vista previa · pokepaste</b><span style="flex:1"></span><button class="btn btn-sm" id="pv-copy">Copiar</button><button class="btn btn-sm btn-ghost" id="pv-dl">.txt</button></div><div class="preview-b"><div id="pv-body"></div></div>');
+  box.appendChild(head);
+  const body=box.querySelector('#pv-body');
+  if(!real.length){
+    body.innerHTML='<p style="color:var(--dim)">Añade un Pokémon para ver la vista previa tipo pokepaste.</p>';
+  }else{
+    body.innerHTML=pasteRender(real);
+    const sum=teamSummary(real,dexIndexCache);
+    const r0=roleOf(real[0]);
+    body.appendChild(h('<div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap">'+sum.main.map(typeChip).join('')+'<span class="chip" style="background:#1e2c48;color:#cfe">'+r0.icon+' '+r0.role+'</span></div>'));
+    body.appendChild(h('<div style="margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--muted)">Media: '+STATS.map(k=>STAT_ES[k]+' '+sum.avg[k]).join(' · ')+'</div>'));
+    body.appendChild(h('<pre class="raw-paste" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px">'+esc(exportTeam(real))+'</pre>'));
+  }
+  head.querySelector('#pv-copy').onclick=()=>copy(exportTeam(real));
+  head.querySelector('#pv-dl').onclick=()=>{
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([exportTeam(real)],{type:'text/plain'}));
+    a.download='equipo.txt';
+    a.click();
+  };
+}
+function openImport(){
+  const ta=h('<textarea placeholder="Pega aquí tu equipo (export de Showdown / pokepaste)…"></textarea>');
+  modal('Importar paste',ta,back=>{
+    back.querySelector('.modal').insertAdjacentHTML('beforeend','<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Cancelar</button><button class="btn btn-primary" data-ok>Importar</button></div>');
+    back.querySelector('[data-x]').onclick=()=>back.remove();
+    back.querySelector('[data-ok]').onclick=async()=>{
+      const parsed=parseTeam(ta.value);
+      parsed.forEach(s=>{
+        if(s.item)s.item=s.item.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/\s+/g,' ').trim();
+      });
+      if(!parsed.length){
+        toast('No he entendido el paste','bad');
+        return;
+      }
+      sets=parsed.slice(0,Settings.size).map(s=>({...s,evs:s.evs||{},ivs:s.ivs||{},moves:s.moves||[]}));
+      while(sets.length<Settings.size)sets.push({});
+      for(const s of sets)if(s.species){
+        const d=await getPokemonDetail(s.species);
+        if(d)dexIndexCache[s.species]=d;
+      }
+      back.remove();
+      renderSlots();
+      renderPreview();
+      const cpc=document.getElementById('cpc');
+      if(cpc)cpc.onclick=()=>copy(room.id);
+      toast(parsed.length+' Pokémon importados','ok');
+    };
+  });
+}
 
-async function onPublish(){const real=sets.filter(s=>s.species);if(!real.length){toast('Añade al menos un Pokémon','warn');return}try{if(!room)await doCreate(false,real);else{await Store.submit(room.id,room.secret,real,Settings.name);toast('Equipo enviado','ok');await refreshRoom()}}catch(e){toast(e.message||'Error','bad')}}
-async function doCreate(silent,team){const real=(team||sets).filter(s=>s.species);if(!real.length){toast('Añade un Pokémon antes de crear la sala','warn');return}try{const r=await Store.create(real,Settings.name);room={id:r.id,secret:r.secret,role:r.role,status:'waiting',you:real};await refreshRoom();if(!silent){viewBuilder();shareCode();}else{location.hash='#/sala/'+room.id;}toast('Sala creada. Pasa el código al rival','ok')}catch(e){toast(e.message||'Error','bad')}}
-function shareCode(){const url=location.origin+location.pathname+'#/unirse/'+room.id;modal('Comparte el acceso','<p style="color:var(--muted)">Dale este <b>código</b> o el <b>enlace</b>. No podrá ver tu equipo hasta que suba el suyo.</p><div class="code-box" style="margin:12px 0">'+room.id+'</div><input type="text" readonly value="'+esc(url)+'" style="font-family:var(--mono);font-size:12px"><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" data-c>📋 Copiar código</button><button class="btn" data-cu>🔗 Copiar enlace</button></div>',back=>{back.querySelector('[data-c]').onclick=()=>copy(room.id);back.querySelector('[data-cu]').onclick=()=>copy(url)})}
-async function refreshRoom(){try{const p=await Store.peek(room.id,room.secret);room={...room,...p}}catch(e){}if(room.status==='revealed')location.hash='#/sala/'+room.id;else if(location.hash.startsWith('#/sala/'))renderRoomView();if(room&&room.status==='revealed')stopPoll()}
-function startPoll(){stopPoll();if(Store.mode==='relay')pollTimer=setInterval(()=>{if(room)refreshRoom()},2500)}
-function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null}}
+async function onPublish(){
+  const real=sets.filter(s=>s.species);
+  if(!real.length){
+    toast('Añade al menos un Pokémon','warn');
+    return;
+  }
+  try{
+    if(!room)await doCreate(false,real);
+    else{
+      await Store.submit(room.id,room.secret,real,Settings.name);
+      toast('Equipo enviado','ok');
+      await refreshRoom();
+    }
+  }catch(e){
+    toast(e.message||'Error','bad');
+  }
+}
+async function doCreate(silent,team){
+  const real=(team||sets).filter(s=>s.species);
+  if(!real.length){
+    toast('Añade un Pokémon antes de crear la sala','warn');
+    return;
+  }
+  try{
+    const r=await Store.create(real,Settings.name);
+    room={id:r.id,secret:r.secret,role:r.role,status:'waiting',you:real};
+    viewBuilder();
+    shareCode();
+    toast('Sala creada. Pasa el código al rival','ok');
+  }catch(e){
+    toast(e.message||'Error','bad');
+  }
+}
+function shareCode(){
+  const url=location.origin+location.pathname+'#/unirse/'+room.id;
+  modal('Comparte el acceso','<p style="color:var(--muted)">Dale este <b>código</b> o el <b>enlace</b>. No podrá ver tu equipo hasta que suba el suyo.</p><div class="code-box" style="margin:12px 0">'+room.id+'</div><input type="text" readonly value="'+esc(url)+'" style="font-family:var(--mono);font-size:12px"><div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" data-c>📋 Copiar código</button><button class="btn" data-cu>🔗 Copiar enlace</button></div>',back=>{
+    back.querySelector('[data-c]').onclick=()=>copy(room.id);
+    back.querySelector('[data-cu]').onclick=()=>copy(url);
+  });
+}
+async function ensureRevealData(){
+  if(!room)return;
+  const all=[...(room.you||[]),...(room.them||[])];
+  for(const s of all){
+    if(s.species&&!dexIndexCache[s.species]){
+      const d=await getPokemonDetail(s.species);
+      if(d)dexIndexCache[s.species]=d;
+    }
+  }
+}
+async function refreshRoom(){
+  if(!room)return;
+  try{
+    const p=await Store.peek(room.id,room.secret);
+    room={...room,...p};
+  }catch(e){
+    return;
+  }
+  if(room.status==='revealed'){
+    await ensureRevealData();
+    if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;
+    else renderRoomView();
+    stopPoll();
+  }else if(location.hash.startsWith('#/sala/')){
+    renderRoomView();
+  }
+}
+function startPoll(){
+  stopPoll();
+  if(Store.mode==='relay')pollTimer=setInterval(()=>{if(room)refreshRoom()},2500);
+}
+function stopPoll(){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null}
+}
 
-function renderRoomView(){const app=document.getElementById('app');if(!location.hash.startsWith('#/sala/'))return;app.innerHTML='';const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span><span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');app.appendChild(top);top.querySelector('#sh').onclick=shareCode;top.querySelector('#back').onclick=()=>{location.hash='#/constructor'};const sb=h('<div style="margin:18px 0"></div>');app.appendChild(sb);
+function renderRoomView(){
+  const app=document.getElementById('app');
+  if(!location.hash.startsWith('#/sala/'))return;
+  app.innerHTML='';
+  if(!room){
+    app.appendChild(h('<div class="card"><h3>Esta sala no está cargada</h3><p style="color:var(--muted)">Entra desde <a href="#/unirse">Unirse</a> con el código.</p></div>'));
+    return;
+  }
+  const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span><span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
+  app.appendChild(top);
+  top.querySelector('#sh').onclick=shareCode;
+  top.querySelector('#back').onclick=()=>{location.hash='#/constructor'};
+  const sb=h('<div style="margin:18px 0"></div>');
+  app.appendChild(sb);
   if(room.status==='waiting')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> Tu equipo está sellado. Esperando a que el rival suba el suyo…</div>'));
   else if(room.status==='pending')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> El rival ya está dentro. <b>Sube tu equipo</b> para desbloquear.</div>'));
-  else if(room.status==='revealed'){sb.appendChild(h('<div class="waiting" style="border-color:rgba(63,214,160,.5);background:rgba(63,214,160,.08);color:#bff3df"><span class="pulse" style="background:var(--ok)"></span> ✅ ¡Intercambio completado!</div>'));app.appendChild(buildReveal());startPoll();return}
-  const wb=h('<div class="workbench"><div class="slots" id="slots"></div><aside class="preview" id="preview"></aside></div>');app.appendChild(wb);renderSlots();renderPreview();const pub=h('<div style="margin-top:14px"><button class="btn '+(room.role==='guest'?'btn-gold':'')+'" id="pb">'+(room.role==='host'?'↻ Actualizar mi equipo':'🔓 Enviar mi equipo')+'</button></div>');app.appendChild(pub);pub.querySelector('#pb').onclick=onPublish;startPoll();
+  else if(room.status==='revealed'){
+    sb.appendChild(h('<div class="waiting" style="border-color:rgba(63,214,160,.5);background:rgba(63,214,160,.08);color:#bff3df"><span class="pulse" style="background:var(--ok)"></span> ✅ ¡Intercambio completado!</div>'));
+    app.appendChild(buildReveal());
+    stopPoll();
+    return;
+  }
+  const wb=h('<div class="workbench"><div class="slots" id="slots"></div><aside class="preview" id="preview"></aside></div>');
+  app.appendChild(wb);
+  renderSlots();
+  renderPreview();
+  const pub=h('<div style="margin-top:14px"><button class="btn '+(room.role==='guest'?'btn-gold':'')+'" id="pb">'+(room.role==='host'?'↻ Actualizar mi equipo':'🔓 Enviar mi equipo')+'</button></div>');
+  app.appendChild(pub);
+  pub.querySelector('#pb').onclick=onPublish;
+  startPoll();
 }
-function buildReveal(){const mine=room.you||[],them=room.them||[];const wrap=h('<div class="vs-seam">VS · análisis cruzado</div><div class="reveal"></div>');const rev=wrap.querySelector('.reveal');rev.appendChild(revealCol('🔵 Tu equipo',mine,them));rev.appendChild(revealCol('🟡 Equipo rival',them,mine));return wrap}
-function revealCol(title,team,enemy){const col=h('<div class="reveal-col"><h3>'+title+'</h3><div class="rv-grid"></div></div>');const grid=col.querySelector('.rv-grid');team.forEach((s,i)=>{const d=dexIndexCache[s.species]||{};const types=d.types||[];grid.appendChild(h('<div class="rv-card" style="animation-delay:'+(i*0.07)+'s"><div class="spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="nm">'+esc(s.species)+'</div><div class="it">'+itemImg(s.item)+esc(s.item||'—')+'</div><div class="types">'+types.map(typeChip).join('')+'</div><div class="mvs">'+(s.moves||[]).filter(Boolean).map(esc).join(' · ')+'</div></div>'))});if(enemy&&enemy.length){const cs=bestCounters(team,enemy,dexIndexCache);const box=h('<div class="counters"></div>');cs.forEach(c=>{if(c.counter&&c.mon.species)box.appendChild(h('<div><b>'+esc(c.mon.species)+'</b> → mejor respuesta rival: <b>'+esc(c.counter.species)+'</b></div>'))});if(box.children.length)col.appendChild(box)}return col}
+function buildReveal(){
+  const mine=room.you||[],them=room.them||[];
+  const wrap=h('<div class="vs-seam">VS · análisis cruzado</div><div class="reveal"></div>');
+  const rev=wrap.querySelector('.reveal');
+  rev.appendChild(revealCol('🔵 Tu equipo',mine,them));
+  rev.appendChild(revealCol('🟡 Equipo rival',them,mine));
+  return wrap;
+}
+function revealCol(title,team,enemy){
+  const col=h('<div class="reveal-col"><h3>'+title+'</h3><div class="rv-grid"></div></div>');
+  const grid=col.querySelector('.rv-grid');
+  team.forEach((s,i)=>{
+    const d=dexIndexCache[s.species]||{};
+    const types=d.types||[];
+    grid.appendChild(h('<div class="rv-card" style="animation-delay:'+(i*0.07)+'s"><div class="spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="nm">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+'</div><div class="it">'+itemImg(s.item)+esc(s.item||'—')+'</div><div class="types">'+types.map(typeChip).join('')+'</div><div class="mvs">'+(s.moves||[]).filter(Boolean).map(esc).join(' · ')+'</div></div>'));
+  });
+  if(enemy&&enemy.length){
+    const cs=bestCounters(team,enemy,dexIndexCache);
+    const box=h('<div class="counters"></div>');
+    cs.forEach(c=>{
+      if(c.counter&&c.mon.species)box.appendChild(h('<div><b>'+esc(c.mon.species)+'</b> → mejor respuesta rival: <b>'+esc(c.counter.species)+'</b></div>'));
+    });
+    if(box.children.length)col.appendChild(box);
+  }
+  return col;
+}
 
-function viewJoin(rest){const app=document.getElementById('app');const pre=rest&&rest[0]?rest[0]:'';app.appendChild(h('<div class="room-wrap"><div class="card"><h3>🔗 Unirse a una sala</h3><p style="color:var(--muted)">Pega el código del anfitrión. Al entrar <b>no verás su equipo</b> hasta que subas el tuyo.</p><div class="field"><label>Código / enlace</label><input id="join-code" placeholder="XXXX-XXXX" value="'+esc(pre)+'" style="font-family:var(--mono);letter-spacing:.2em;text-transform:uppercase"></div><div class="field"><label>Tu nombre</label><input id="join-name" placeholder="Rival"></div><button class="btn btn-primary" id="dojoin">Entrar y subir mi equipo</button></div><div class="card"><h3>¿Cómo funciona?</h3><p style="color:var(--muted)">1) Entrar reserva tu plaza.<br>2) Construyes tu equipo.<br>3) Al pulsar <b>Enviar</b>, el servidor libera ambos equipos a la vez.</p><p style="color:var(--dim);font-size:12.5px">Modo: <b>'+Store.mode+'</b>'+(Store.mode==='local'?' (mismo navegador, 2 pestañas)':' (relay)')+'</p></div></div>'));app.querySelector('#dojoin').onclick=async()=>{const code=document.getElementById('join-code').value.trim().replace(/^.*\/unirse\//,'').replace(/[^A-Za-z0-9-]/g,'').toUpperCase();Settings.name=document.getElementById('join-name').value.trim();saveSettings();if(!code){toast('Introduce un código','warn');return}try{const r=await Store.join(code);room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[]};location.hash='#/sala/'+code}catch(e){toast(e.message||'No se pudo entrar','bad')}}}
-function viewRooms(){const app=document.getElementById('app');const rs=Store.myRooms();app.appendChild(h('<h2 class="section-title">Mis salas ('+rs.length+')</h2><div class="roomlist" id="rl"></div>'));const rl=app.querySelector('#rl');if(!rs.length){rl.appendChild(h('<p style="color:var(--dim)">No tienes salas en este navegador.</p>'));return}rs.sort((a,b)=>b.createdAt-a.createdAt).forEach(r=>{const row=h('<div class="roomrow"><span class="rid">'+r.id+'</span><span style="color:var(--muted)">'+(r.guest?(r.guest.team?'revelada':'rival esperando'):'sin rival')+'</span><span style="flex:1"></span><button class="btn btn-sm" data-open>Abrir</button><button class="btn btn-sm btn-danger" data-del>Borrar</button></div>');row.querySelector('[data-open]').onclick=()=>{room={id:r.id,secret:(r.host&&r.host.secret)||'',role:r.host&&r.host.team?'host':'guest',status:'waiting',you:r.host&&r.host.team?r.host.team:[]};location.hash='#/sala/'+r.id};row.querySelector('[data-del]').onclick=()=>{Store.forget(r.id);viewRooms()};rl.appendChild(row)})}
-async function viewDex(){const app=document.getElementById('app');app.appendChild(h('<h2 class="section-title">Pokédex · todos los sprites</h2><div class="dexbar"><input id="dexq" placeholder="Buscar por nombre, tipo o nº…" style="max-width:360px"><select id="dextype"><option value="">Todos los tipos</option>'+TYPES.map(t=>'<option value="'+t+'">'+typeES(t)+'</option>').join('')+'</select><span style="color:var(--dim);font-size:13px" id="dexcount">cargando…</span></div><div class="dex-grid" id="dexgrid"></div>'));const grid=app.querySelector('#dexgrid'),count=app.querySelector('#dexcount');const idx=await loadPokemonIndex();const render=list=>{grid.innerHTML=list.slice(0,240).map(p=>'<div class="dex-card" data-name="'+p.name+'" style="--tc:'+(dexIndexCache[p.name]?typeColor(dexIndexCache[p.name].types[0]):'')+'"><span class="no">#'+String(p.id).padStart(4,'0')+'</span>'+spr(p.name,'')+'<div class="nm">'+esc(p.name)+'</div><div class="ty">'+(dexIndexCache[p.name]?dexIndexCache[p.name].types.map(miniType).join(''):'')+'</div></div>').join('');grid.querySelectorAll('.dex-card').forEach(c=>{c.onclick=()=>openMon(c.dataset.name);if(!dexIndexCache[c.dataset.name])getPokemonDetail(c.dataset.name).then(d=>{if(d){dexIndexCache[c.dataset.name]=d;const ty=c.querySelector('.ty');if(ty)ty.innerHTML=d.types.map(miniType).join('');c.style.setProperty('--tc',typeColor(d.types[0]))}})})};const apply=()=>{const q=slug(document.getElementById('dexq').value);const ty=document.getElementById('dextype').value;const f=idx.filter(p=>(!q||slug(p.name).includes(q))&&(!ty||((dexIndexCache[p.name]||{}).types||[]).includes(ty)));count.textContent=f.length+' resultados';render(f)};document.getElementById('dexq').oninput=apply;document.getElementById('dextype').onchange=apply;count.textContent=idx.length+' Pokémon';render(idx);let n=0;const tick=setInterval(async()=>{for(let i=0;i<12&&n<idx.length;i++,n++){const d=await getPokemonDetail(idx[n].name);if(d)dexIndexCache[idx[n].name]=d}if(n>=idx.length)clearInterval(tick)},250)}
-function openMon(name){const d=dexIndexCache[name]||{};modal(name,'<div style="display:flex;gap:14px;align-items:center">'+spr(name,'','ani')+'<div><div style="display:flex;gap:6px">'+(d.types||[]).map(typeChip).join('')+'</div><div style="margin-top:8px;font-family:var(--mono);font-size:12px;color:var(--muted)">'+STATS.map(k=>STAT_ES[k]+': '+(d.stats?d.stats[k]:'—')).join(' · ')+'</div></div></div><div style="margin-top:14px"><button class="btn btn-primary" data-add>Añadir al equipo</button></div>',back=>{back.querySelector('[data-add]').onclick=async()=>{let s=sets.find(x=>!x.species);if(!s){if(sets.length<Settings.size){sets.push(blank());s=sets[sets.length-1]}else{toast('Equipo lleno','warn');return}}s.species=name;s.form='';const dd=await getPokemonDetail(name);if(dd)dexIndexCache[name]=dd;back.remove();location.hash='#/constructor';toast(name+' añadido','ok')}})}
-function viewSettings(){const app=document.getElementById('app');app.appendChild(h('<h2 class="section-title">Ajustes</h2><div class="card"><div class="opt"><div><h4>Modo de salas</h4><p>Local = mismo navegador (2 pestañas). Relay = backend propio para ciego real entre dispositivos.</p></div><div class="seg" id="smode"><button data-m="local" class="'+(Store.mode==='local'?'on':'')+'">Local</button><button data-m="relay" class="'+(Store.mode==='relay'?'on':'')+'">Relay</button></div></div><div class="opt"><div><h4>URL del backend Relay</h4><p>Ej: <code>http://localhost:8787</code> o tu Worker.</p></div><input id="relayurl" value="'+esc(Store.relayUrl)+'" style="max-width:280px"></div><div class="opt"><div><h4>Estilo de sprite</h4><p>Misma fuente que pokepaste (Showdown).</p></div><select id="sstyle" style="max-width:200px">'+[['showdown','Showdown'],['ani','Gen V animado'],['gen5','Gen V estático'],['xy','XY'],['orig','Original']].map(o=>'<option value="'+o[0]+'" '+(Settings.sprite===o[0]?'selected':'')+'>'+o[1]+'</option>').join('')+'</select></div><div class="opt"><div><h4>Shiny por defecto</h4></div><input type="checkbox" id="sshiny" '+(Settings.shiny?'checked':'')+'></div><div class="opt"><div><h4>Tamaño del equipo</h4></div><select id="ssize" style="max-width:120px">'+[1,2,3,4,5,6].map(n=>'<option '+(Settings.size===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="opt"><div><h4>Tu nombre</h4></div><input id="sname" value="'+esc(Settings.name)+'" style="max-width:200px"></div><div class="opt"><div><h4>Caché Pokédex</h4></div><button class="btn btn-sm btn-danger" id="clearcache">Vaciar</button></div></div>'));app.querySelector('#smode').onclick=e=>{const b=e.target.closest('button');if(!b)return;Store.mode=b.dataset.m;viewSettings()};app.querySelector('#relayurl').onchange=e=>{Store.relayUrl=e.target.value.trim()};app.querySelector('#sstyle').onchange=e=>{Settings.sprite=e.target.value;saveSettings()};app.querySelector('#sshiny').onchange=e=>{Settings.shiny=e.target.checked;saveSettings()};app.querySelector('#ssize').onchange=e=>{Settings.size=+e.target.value;saveSettings()};app.querySelector('#sname').onchange=e=>{Settings.name=e.target.value;saveSettings()};app.querySelector('#clearcache').onclick=()=>{['cpaste.dex.p','cpaste.dex.i'].forEach(k=>localStorage.removeItem(k));DexCache.pokemon=DexCache.items=null;toast('Caché vaciada','ok')}}
-function startBg(){const cv=document.getElementById('spritefield');if(!cv)return;const ctx=cv.getContext('2d');const cols=Object.values(TYPE_COLOR);let P=[];const resize=()=>{cv.width=innerWidth;cv.height=innerHeight;P=[];const n=Math.min(70,Math.floor(innerWidth/26));for(let i=0;i<n;i++)P.push({x:Math.random()*cv.width,y:Math.random()*cv.height,r:1+Math.random()*2.4,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,c:cols[Math.floor(Math.random()*cols.length)],a:.2+Math.random()*.5})};resize();addEventListener('resize',resize);(function loop(){ctx.clearRect(0,0,cv.width,cv.height);for(const p of P){p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=cv.width;if(p.x>cv.width)p.x=0;if(p.y<0)p.y=cv.height;if(p.y>cv.height)p.y=0;ctx.globalAlpha=p.a;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill()}ctx.globalAlpha=1;requestAnimationFrame(loop)})()}
+function viewJoin(rest){
+  const app=document.getElementById('app');
+  const pre=rest&&rest[0]?rest[0]:'';
+  app.appendChild(h('<div class="room-wrap"><div class="card"><h3>🔗 Unirse a una sala</h3><p style="color:var(--muted)">Pega el código del anfitrión. Al entrar <b>no verás su equipo</b> hasta que subas el tuyo.</p><div class="field"><label>Código / enlace</label><input id="join-code" placeholder="XXXX-XXXX" value="'+esc(pre)+'" style="font-family:var(--mono);letter-spacing:.2em;text-transform:uppercase"></div><div class="field"><label>Tu nombre</label><input id="join-name" placeholder="Rival"></div><button class="btn btn-primary" id="dojoin">Entrar y subir mi equipo</button></div><div class="card"><h3>¿Cómo funciona?</h3><p style="color:var(--muted)">1) Entrar reserva tu plaza.<br>2) Construyes tu equipo.<br>3) Al pulsar <b>Enviar</b>, el servidor libera ambos equipos a la vez.</p><p style="color:var(--dim);font-size:12.5px">Modo: <b>'+Store.mode+'</b>'+(Store.mode==='local'?' (mismo navegador, 2 pestañas)':' (relay)')+'</p></div></div>'));
+  app.querySelector('#dojoin').onclick=async()=>{
+    const code=document.getElementById('join-code').value.trim().replace(/^.*\/unirse\//,'').replace(/[^A-Za-z0-9-]/g,'').toUpperCase();
+    Settings.name=document.getElementById('join-name').value.trim();
+    saveSettings();
+    if(!code){
+      toast('Introduce un código','warn');
+      return;
+    }
+    try{
+      const r=await Store.join(code);
+      room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[]};
+      location.hash='#/sala/'+code;
+    }catch(e){
+      toast(e.message||'No se pudo entrar','bad');
+    }
+  };
+}
+function viewRooms(){
+  const app=document.getElementById('app');
+  const rs=Store.myRooms();
+  app.appendChild(h('<h2 class="section-title">Mis salas ('+rs.length+')</h2><div class="roomlist" id="rl"></div>'));
+  const rl=app.querySelector('#rl');
+  if(!rs.length){
+    rl.appendChild(h('<p style="color:var(--dim)">No tienes salas en este navegador.</p>'));
+    return;
+  }
+  rs.sort((a,b)=>b.createdAt-a.createdAt).forEach(r=>{
+    const role=r.host&&r.host.team?'host':'guest';
+    const secret=(r.host&&r.host.secret)||(r.guest&&r.guest.secret)||'';
+    const row=h('<div class="roomrow"><span class="rid">'+r.id+'</span><span style="color:var(--muted)">'+(r.guest?(r.guest.team?'revelada':'rival esperando'):'sin rival')+'</span><span style="flex:1"></span><button class="btn btn-sm" data-open>Abrir</button><button class="btn btn-sm btn-danger" data-del>Borrar</button></div>');
+    row.querySelector('[data-open]').onclick=()=>{
+      room={id:r.id,secret:secret,role:role,status:r.guest&&r.guest.team?'revealed':'waiting',you:r.host&&r.host.team?r.host.team:[]};
+      location.hash='#/sala/'+r.id;
+    };
+    row.querySelector('[data-del]').onclick=()=>{Store.forget(r.id);viewRooms()};
+    rl.appendChild(row);
+  });
+}
+async function viewDex(){
+  const app=document.getElementById('app');
+  app.appendChild(h('<h2 class="section-title">Pokédex · todos los sprites</h2><div class="dexbar"><input id="dexq" placeholder="Buscar por nombre, tipo o nº…" style="max-width:360px"><select id="dextype"><option value="">Todos los tipos</option>'+TYPES.map(t=>'<option value="'+t+'">'+typeES(t)+'</option>').join('')+'</select><span style="color:var(--dim);font-size:13px" id="dexcount">cargando…</span></div><div class="dex-grid" id="dexgrid"></div>'));
+  const grid=app.querySelector('#dexgrid'),count=app.querySelector('#dexcount');
+  const idx=await loadPokemonIndex();
+  const render=list=>{
+    grid.innerHTML=list.slice(0,240).map(p=>'<div class="dex-card" data-name="'+p.name+'" style="--tc:'+(dexIndexCache[p.name]?typeColor(dexIndexCache[p.name].types[0]):'')+'"><span class="no">#'+String(p.id).padStart(4,'0')+'</span>'+spr(p.name,'')+'<div class="nm">'+esc(p.name)+'</div><div class="ty">'+(dexIndexCache[p.name]?dexIndexCache[p.name].types.map(miniType).join(''):'')+'</div></div>').join('');
+    grid.querySelectorAll('.dex-card').forEach(c=>{
+      c.onclick=()=>openMon(c.dataset.name);
+      if(!dexIndexCache[c.dataset.name])getPokemonDetail(c.dataset.name).then(d=>{
+        if(d){
+          dexIndexCache[c.dataset.name]=d;
+          const ty=c.querySelector('.ty');
+          if(ty)ty.innerHTML=d.types.map(miniType).join('');
+          c.style.setProperty('--tc',typeColor(d.types[0]));
+        }
+      });
+    });
+  };
+  const apply=()=>{
+    const q=slug(document.getElementById('dexq').value);
+    const ty=document.getElementById('dextype').value;
+    const f=idx.filter(p=>(!q||slug(p.name).includes(q))&&(!ty||((dexIndexCache[p.name]||{}).types||[]).includes(ty)));
+    count.textContent=f.length+' resultados';
+    render(f);
+  };
+  document.getElementById('dexq').oninput=apply;
+  document.getElementById('dextype').onchange=apply;
+  count.textContent=idx.length+' Pokémon';
+  render(idx);
+  let n=0;
+  const tick=setInterval(async()=>{
+    for(let i=0;i<12&&n<idx.length;i++,n++){
+      const d=await getPokemonDetail(idx[n].name);
+      if(d)dexIndexCache[idx[n].name]=d;
+    }
+    if(n>=idx.length)clearInterval(tick);
+  },250);
+}
+function openMon(name){
+  const d=dexIndexCache[name]||{};
+  modal(name,'<div style="display:flex;gap:14px;align-items:center">'+spr(name,'','ani')+'<div><div style="display:flex;gap:6px">'+(d.types||[]).map(typeChip).join('')+'</div><div style="margin-top:8px;font-family:var(--mono);font-size:12px;color:var(--muted)">'+STATS.map(k=>STAT_ES[k]+': '+(d.stats?d.stats[k]:'—')).join(' · ')+'</div></div></div><div style="margin-top:14px"><button class="btn btn-primary" data-add>Añadir al equipo</button></div>',back=>{
+    back.querySelector('[data-add]').onclick=async()=>{
+      let s=sets.find(x=>!x.species);
+      if(!s){
+        if(sets.length<Settings.size){
+          sets.push(blank());
+          s=sets[sets.length-1];
+        }else{
+          toast('Equipo lleno','warn');
+          return;
+        }
+      }
+      s.species=name;
+      s.form='';
+      s.shiny=Settings.shiny;
+      const dd=await getPokemonDetail(name);
+      if(dd)dexIndexCache[name]=dd;
+      back.remove();
+      location.hash='#/constructor';
+      toast(name+' añadido','ok');
+    };
+  });
+}
+function viewSettings(){
+  const app=document.getElementById('app');
+  app.appendChild(h('<h2 class="section-title">Ajustes</h2><div class="card"><div class="opt"><div><h4>Modo de salas</h4><p>Local = mismo navegador (2 pestañas). Relay = backend propio para ciego real entre dispositivos.</p></div><div class="seg" id="smode"><button data-m="local" class="'+(Store.mode==='local'?'on':'')+'">Local</button><button data-m="relay" class="'+(Store.mode==='relay'?'on':'')+'">Relay</button></div></div><div class="opt"><div><h4>URL del backend Relay</h4><p>Ej: <code>http://localhost:8787</code> o tu Worker.</p></div><input id="relayurl" value="'+esc(Store.relayUrl)+'" style="max-width:280px"></div><div class="opt"><div><h4>Estilo de sprite</h4><p>Misma fuente que pokepaste (Showdown).</p></div><select id="sstyle" style="max-width:200px">'+[['showdown','Showdown'],['ani','Gen V animado'],['gen5','Gen V estático'],['xy','XY'],['orig','Original']].map(o=>'<option value="'+o[0]+'" '+(Settings.sprite===o[0]?'selected':'')+'>'+o[1]+'</option>').join('')+'</select></div><div class="opt"><div><h4>Shiny por defecto</h4></div><input type="checkbox" id="sshiny" '+(Settings.shiny?'checked':'')+'></div><div class="opt"><div><h4>Tamaño del equipo</h4></div><select id="ssize" style="max-width:120px">'+[1,2,3,4,5,6].map(n=>'<option '+(Settings.size===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="opt"><div><h4>Tu nombre</h4></div><input id="sname" value="'+esc(Settings.name)+'" style="max-width:200px"></div><div class="opt"><div><h4>Caché Pokédex</h4></div><button class="btn btn-sm btn-danger" id="clearcache">Vaciar</button></div></div>'));
+  app.querySelector('#smode').onclick=e=>{
+    const b=e.target.closest('button');
+    if(!b)return;
+    Store.mode=b.dataset.m;
+    viewSettings();
+  };
+  app.querySelector('#relayurl').onchange=e=>{Store.relayUrl=e.target.value.trim()};
+  app.querySelector('#sstyle').onchange=e=>{Settings.sprite=e.target.value;saveSettings()};
+  app.querySelector('#sshiny').onchange=e=>{Settings.shiny=e.target.checked;saveSettings()};
+  app.querySelector('#ssize').onchange=e=>{Settings.size=+e.target.value;saveSettings()};
+  app.querySelector('#sname').onchange=e=>{Settings.name=e.target.value;saveSettings()};
+  app.querySelector('#clearcache').onclick=()=>{
+    ['cpaste.dex.p','cpaste.dex.i'].forEach(k=>localStorage.removeItem(k));
+    DexCache.pokemon=DexCache.items=null;
+    toast('Caché vaciada','ok');
+  };
+}
+function startBg(){
+  const cv=document.getElementById('spritefield');
+  if(!cv)return;
+  const ctx=cv.getContext('2d');
+  const cols=Object.values(TYPE_COLOR);
+  let P=[];
+  const resize=()=>{
+    cv.width=innerWidth;
+    cv.height=innerHeight;
+    P=[];
+    const n=Math.min(70,Math.floor(innerWidth/26));
+    for(let i=0;i<n;i++)P.push({x:Math.random()*cv.width,y:Math.random()*cv.height,r:1+Math.random()*2.4,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,c:cols[Math.floor(Math.random()*cols.length)],a:.2+Math.random()*.5});
+  };
+  resize();
+  addEventListener('resize',resize);
+  (function loop(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(const p of P){
+      p.x+=p.vx;
+      p.y+=p.vy;
+      if(p.x<0)p.x=cv.width;
+      if(p.x>cv.width)p.x=0;
+      if(p.y<0)p.y=cv.height;
+      if(p.y>cv.height)p.y=0;
+      ctx.globalAlpha=p.a;
+      ctx.fillStyle=p.c;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,7);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    requestAnimationFrame(loop);
+  })();
+}
 </script>
 </body>
 </html>
