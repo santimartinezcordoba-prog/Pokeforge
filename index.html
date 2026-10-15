@@ -927,6 +927,11 @@ function shareCode(){
 }
 async function ensureRevealData(){
   if(!room)return;
+  const me=room.secret==='p2'?'p2':'p1';
+  const foe=room.secret==='p2'?'p1':'p2';
+  const fix=a=>(a||[]).map(s=>{if(s.item)s.item=s.item.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/\s+/g,' ').trim();return s;});
+  if(room[me]&&room[me].team)room.you=fix(parseTeam(room[me].team));
+  if(room[foe]&&room[foe].team)room.them=fix(parseTeam(room[foe].team));
   const all=[...(room.you||[]),...(room.them||[])];
   for(const s of all){
     if(s.species&&!dexIndexCache[s.species]){
@@ -943,7 +948,8 @@ async function refreshRoom(){
   }catch(e){
     return;
   }
-  if(room.status==='revealed'){
+    if(room.ready===true||room.status==='ready'){
+    room.status='revealed';
     await ensureRevealData();
     if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;
     else renderRoomView();
