@@ -894,8 +894,7 @@ async function onPublish(){
   try{
     if(!room)await doCreate(false,real);
     else{
-      await Store.submit(room.id,room.secret,real,Settings.name);
-      toast('Equipo enviado','ok');
+      await Store.submit(room.id,room.secret,exportTeam(real),Settings.name);      toast('Equipo enviado','ok');
       await refreshRoom();
     }
   }catch(e){
