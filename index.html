@@ -435,85 +435,30 @@ function teamSummary(sets,dex){
 
 /* ================= STORE ================= */
 const Store=(()=>{
-  const LS='cpaste.rooms.v1';
-  let mode=localStorage.getItem('cpaste.mode')||'local';
-  let relayUrl=localStorage.getItem('cpaste.relay')||'';
-  const bc=('BroadcastChannel'in window)?new BroadcastChannel('cpaste'):null;
+  const mode='relay';
+  let relayUrl=localStorage.getItem('cpaste.relay')||'https://ciega-relay.santimartinezcordoba.workers.dev';
   const L=new Set();
   const emit=()=>L.forEach(f=>f());
   const on=f=>{L.add(f);return()=>L.delete(f)};
-  const rooms=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){return{}}};
-  const save=r=>localStorage.setItem(LS,JSON.stringify(r));
-  const rid=()=>{const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<8;i++)s+=c[Math.floor(Math.random()*c.length)];return s.slice(0,4)+'-'+s.slice(4)};
-  const sec=()=>{const a=new Uint8Array(16);crypto.getRandomValues(a);return[...a].map(x=>x.toString(16).padStart(2,'0')).join('')};
-  function lCreate(team,name){
-    const id=rid();
-    const r=rooms();
-    r[id]={id,host:{secret:sec(),name:name||'Anfitrión',team},guest:null,createdAt:Date.now()};
-    save(r);
-    bc&&bc.postMessage(id);
-    return{id,secret:r[id].host.secret,role:'host'};
-  }
-  function lJoin(id){
-    const r=rooms();
-    const room=r[id];
-    if(!room)throw new Error('No existe esa sala en ESTE navegador (modo Local = misma ventana, 2 pestañas). Para jugar entre dispositivos, activa Relay en Ajustes.');
-    if(room.guest)throw new Error('La sala ya tiene un rival.');
-    room.guest={secret:sec(),team:null,name:'Rival'};
-    save(r);
-    bc&&bc.postMessage(id);
-    return{id,secret:room.guest.secret,role:'guest'};
-  }
-  function lSubmit(id,sk,team,name){
-    const r=rooms();
-    const room=r[id];
-    if(!room)throw new Error('Sala no encontrada');
-    const slot=room.host.secret===sk?'host':(room.guest&&room.guest.secret===sk?'guest':null);
-    if(!slot)throw new Error('Credencial incorrecta');
-    room[slot]={...room[slot],team,name:name||room[slot].name};
-    save(r);
-    bc&&bc.postMessage(id);
-    return true;
-  }
-  function lPeek(id,sk){
-    const room=rooms()[id];
-    if(!room)throw new Error('Sala no encontrada');
-    const me=room.host.secret===sk?'host':'guest';
-    const other=me==='host'?'guest':'host';
-    const mine=room[me]?room[me].team:null;
-    const both=mine&&room[other]&&room[other].team;
-    return{
-      status:!room[other]?'waiting':(both?'revealed':'pending'),
-      you:mine,
-      youName:room[me]&&room[me].name,
-      them:both?room[other].team:null,
-      themName:room[other]&&room[other].name,
-      role:me
-    };
-  }
   async function rel(p,b){
     const r=await fetch(relayUrl.replace(/\/$/,'')+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
     const j=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(j.error||('HTTP '+r.status));
     return j;
   }
-  window.addEventListener('storage',e=>{if(e.key===LS)emit()});
-  bc&&(bc.onmessage=()=>emit());
   return{
-    get mode(){return mode},
-    set mode(v){mode=v;localStorage.setItem('cpaste.mode',v);emit()},
+    mode,
     get relayUrl(){return relayUrl},
     set relayUrl(v){relayUrl=v;localStorage.setItem('cpaste.relay',v)},
-    on,emit,rid,
-    create:(t,n)=>mode==='relay'?rel('/api/create',{team:t,name:n}).then(j=>({id:j.id,secret:j.secret,role:'host'})):lCreate(t,n),
-    join:(id)=>mode==='relay'?rel('/api/join',{id}).then(j=>({id,secret:j.secret,role:'guest'})):lJoin(id),
-    submit:(id,sk,t,n)=>mode==='relay'?rel('/api/submit',{id,secret:sk,team:t,name:n}):lSubmit(id,sk,t,n),
-    peek:(id,sk)=>mode==='relay'?rel('/api/peek',{id,secret:sk}):lPeek(id,sk),
-    myRooms:()=>mode==='relay'?[]:Object.values(rooms()),
-    forget(id){const r=rooms();delete r[id];save(r);emit()}
+    on,emit,
+    create:(t,n)=>rel('/api/create',{team:t,name:n}).then(j=>({id:j.id,secret:j.secret,role:'host'})),
+    join:(id)=>rel('/api/join',{id}).then(j=>({id,secret:j.secret,role:'guest'})),
+    submit:(id,sk,t,n)=>rel('/api/submit',{id,secret:sk,team:t,name:n}),
+    peek:(id,sk)=>rel('/api/peek',{id,secret:sk}),
+    myRooms:()=>[],
+    forget(){}
   };
 })();
-
 /* ================= UI ================= */
 function h(html){
   const t=document.createElement('template');
@@ -1189,26 +1134,6 @@ function openMon(name){
     };
   });
 }
-function viewSettings(){
-  const app=document.getElementById('app');
-  app.appendChild(h('<h2 class="section-title">Ajustes</h2><div class="card"><div class="opt"><div><h4>Modo de salas</h4><p>Local = mismo navegador (2 pestañas). Relay = backend propio para ciego real entre dispositivos.</p></div><div class="seg" id="smode"><button data-m="local" class="'+(Store.mode==='local'?'on':'')+'">Local</button><button data-m="relay" class="'+(Store.mode==='relay'?'on':'')+'">Relay</button></div></div><div class="opt"><div><h4>URL del backend Relay</h4><p>Ej: <code>http://localhost:8787</code> o tu Worker.</p></div><input id="relayurl" value="'+esc(Store.relayUrl)+'" style="max-width:280px"></div><div class="opt"><div><h4>Estilo de sprite</h4><p>Misma fuente que pokepaste (Showdown).</p></div><select id="sstyle" style="max-width:200px">'+[['showdown','Showdown'],['ani','Gen V animado'],['gen5','Gen V estático'],['xy','XY'],['orig','Original']].map(o=>'<option value="'+o[0]+'" '+(Settings.sprite===o[0]?'selected':'')+'>'+o[1]+'</option>').join('')+'</select></div><div class="opt"><div><h4>Shiny por defecto</h4></div><input type="checkbox" id="sshiny" '+(Settings.shiny?'checked':'')+'></div><div class="opt"><div><h4>Tamaño del equipo</h4></div><select id="ssize" style="max-width:120px">'+[1,2,3,4,5,6].map(n=>'<option '+(Settings.size===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="opt"><div><h4>Tu nombre</h4></div><input id="sname" value="'+esc(Settings.name)+'" style="max-width:200px"></div><div class="opt"><div><h4>Caché Pokédex</h4></div><button class="btn btn-sm btn-danger" id="clearcache">Vaciar</button></div></div>'));
-  app.querySelector('#smode').onclick=e=>{
-    const b=e.target.closest('button');
-    if(!b)return;
-    Store.mode=b.dataset.m;
-    viewSettings();
-  };
-  app.querySelector('#relayurl').onchange=e=>{Store.relayUrl=e.target.value.trim()};
-  app.querySelector('#sstyle').onchange=e=>{Settings.sprite=e.target.value;saveSettings()};
-  app.querySelector('#sshiny').onchange=e=>{Settings.shiny=e.target.checked;saveSettings()};
-  app.querySelector('#ssize').onchange=e=>{Settings.size=+e.target.value;saveSettings()};
-  app.querySelector('#sname').onchange=e=>{Settings.name=e.target.value;saveSettings()};
-  app.querySelector('#clearcache').onclick=()=>{
-    ['cpaste.dex.p','cpaste.dex.i'].forEach(k=>localStorage.removeItem(k));
-    DexCache.pokemon=DexCache.items=null;
-    toast('Caché vaciada','ok');
-  };
-}
 function viewRooms(){
   const app=document.getElementById('app');
   app.innerHTML='';
@@ -1224,6 +1149,16 @@ function viewRooms(){
     row.querySelector('[data-del]').onclick=()=>{Store.forget(r.id);toast('Sala '+r.id+' borrada','ok');viewRooms()};
     rl.appendChild(row);
   });
+}
+function viewSettings(){
+  const app=document.getElementById('app');
+  app.appendChild(h('<h2 class="section-title">Ajustes</h2><div class="card"><div class="opt"><div><h4>Modo de salas</h4><p>Relay · backend compartido. Cualquier persona con el código puede unirse desde su dispositivo.</p></div><span class="badge badge-relay">RELAY</span></div><div class="opt"><div><h4>URL del backend Relay</h4><p>Solo cámbiala si despliegas otro worker.</p></div><input id="relayurl" value="'+esc(Store.relayUrl)+'" style="max-width:320px"></div><div class="opt"><div><h4>Estilo de sprite</h4><p>Misma fuente que pokepaste (Showdown).</p></div><select id="sstyle" style="max-width:200px">'+[['showdown','Showdown'],['ani','Gen V animado'],['gen5','Gen V estático'],['xy','XY'],['orig','Original']].map(o=>'<option value="'+o[0]+'" '+(Settings.sprite===o[0]?'selected':'')+'>'+o[1]+'</option>').join('')+'</select></div><div class="opt"><div><h4>Shiny por defecto</h4></div><input type="checkbox" id="sshiny" '+(Settings.shiny?'checked':'')+'></div><div class="opt"><div><h4>Tamaño del equipo</h4></div><select id="ssize" style="max-width:120px">'+[1,2,3,4,5,6].map(n=>'<option '+(Settings.size===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="opt"><div><h4>Tu nombre</h4></div><input id="sname" value="'+esc(Settings.name)+'" style="max-width:200px"></div><div class="opt"><div><h4>Caché Pokédex</h4></div><button class="btn btn-sm btn-danger" id="clearcache">Vaciar</button></div></div>'));
+  app.querySelector('#relayurl').onchange=e=>{Store.relayUrl=e.target.value.trim()};
+  app.querySelector('#sstyle').onchange=e=>{Settings.sprite=e.target.value;saveSettings()};
+  app.querySelector('#sshiny').onchange=e=>{Settings.shiny=e.target.checked;saveSettings()};
+  app.querySelector('#ssize').onchange=e=>{Settings.size=+e.target.value;saveSettings()};
+  app.querySelector('#sname').onchange=e=>{Settings.name=e.target.value;saveSettings()};
+  app.querySelector('#clearcache').onclick=()=>{['cpaste.dex.p','cpaste.dex.i'].forEach(k=>localStorage.removeItem(k));DexCache.pokemon=DexCache.items=null;toast('Caché vaciada','ok')};
 }
 function startBg(){
   const cv=document.getElementById('spritefield');
