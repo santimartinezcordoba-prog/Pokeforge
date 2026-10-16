@@ -216,7 +216,9 @@ function spriteShowdown(n,f,st,sh){
   return SD+'/'+path+'/'+s+(gif?'.gif':'.png');
 }
 function spritePokeAPI(n,sh){
-  return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+(sh?'shiny/':'')+idByName(n)+'.png';
+  const id=idByName(n);
+  if(!id)return '';
+  return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+(sh?'shiny/':'')+id+'.png';
 }
 function itemShowdown(n){return SD+'/itemicons/'+slug(n).replace(/-/g,'')+'.png'}
 function itemPokeAPI(n){return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+slug(n)+'.png'}
@@ -256,10 +258,16 @@ function spriteCandidates(n,f){
     if(base==='ogerpon'&&!suffix.includes('mask'))add(base+'-'+suffix+'-mask');
     add(base);
   }
-  if(f){
-    const b=slug(n), fs=slug(f);
-    if(fs)add(b+'-'+fs);
-  }
+  if(f){const b=slug(n),fs=slug(f);if(fs)add(b+'-'+fs);}
+  const FORMS={
+    oricorio:['oricorio-pom-p','oricorio-pau','oricorio-sensu','oricorio'],
+    maushold:['maushold-family','maushold'],
+    basculegion:['basculegion-f','basculegion-m'],
+    tatsugiri:['tatsugiri-droopy','tatsugiri-stretchy','tatsugiri'],
+    squawkabilly:['squawkabilly-plum','squawkabilly-white','squawkabilly-blue','squawkabilly']
+  };
+  const base=sl.split('-')[0];
+  if(FORMS[base])for(const fm of FORMS[base])add(fm);
   return out;
 }
 function spr(n,f,style,sh){
