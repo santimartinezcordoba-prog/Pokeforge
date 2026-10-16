@@ -171,6 +171,7 @@ const DEF={normal:{rock:.5,ghost:0,steel:.5},fire:{fire:.5,water:.5,grass:2,ice:
 const STATS=['hp','atk','def','spa','spd','spe'];
 const STAT_ES={hp:'PS',atk:'Atq',def:'Def',spa:'At.E',spd:'Def.E',spe:'Vd'};
 const NATURES=['Adamant','Brave','Jolly','Timid','Modest','Careful','Impish','Bold','Calm','Sassy','Lax','Naive','Naughty','Rash','Lonely','Quiet','Hasty','Gentle','Mild','Hardy','Docile','Serious','Bashful','Quirky','Relaxed'];
+const NAT_ES={Adamant:'Firme',Brave:'Audaz',Jolly:'Alegre',Timid:'Miedosa',Modest:'Modesta',Careful:'Cauta',Impish:'Agitada',Bold:'Osada',Calm:'Serena',Sassy:'Maleducada',Lax:'Flácida',Naive:'Ingenua',Naughty:'Pícara',Rash:'Mansa',Lonely:'Sola',Quiet:'Quieta',Hasty:'Ligera',Gentle:'Amable',Mild:'Cobardona',Hardy:'Dura',Docile:'Dócil',Serious:'Seria',Bashful:'Tímida',Quirky:'Rara',Relaxed:'Plácida'};
 const NMOD={Adamant:['atk','spa'],Brave:['atk','spe'],Jolly:['spe','spa'],Timid:['spe','atk'],Modest:['spa','atk'],Careful:['spd','spa'],Impish:['def','spa'],Bold:['def','atk'],Calm:['spd','atk'],Sassy:['spd','def'],Lax:['def','spd'],Naive:['spe','spd'],Naughty:['atk','spd'],Rash:['spa','spd'],Lonely:['atk','def'],Quiet:['spa','spe'],Hasty:['spe','def'],Gentle:['spd','def'],Mild:['spa','def'],Hardy:[],Docile:[],Serious:[],Bashful:[],Quirky:[],Relaxed:['def','spe']};
 const SD='https://play.pokemonshowdown.com/sprites';
 function slug(s){return String(s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
@@ -663,8 +664,6 @@ function joinRoom(code){
 function viewHome(){
   const app=document.getElementById('app');
   app.appendChild(h('<section class="hero"><div class="hero-side you"><span class="hero-tag">◉ Tú · siempre visible</span><h2 class="hero-h">Sube tu equipo<br>a ciegas.</h2><p class="hero-p">Construye tu equipo con sprites reales, estilo pokepaste. Nadie lo verá… hasta que el rival suba el suyo.</p><div class="hero-actions"><button class="btn btn-primary btn-lg" data-act="create">➕ Crear sala y publicar</button><a class="btn btn-lg" href="#/dex">📖 Pokédex</a></div><div class="term"><div class="term-bar"><i></i><i></i><i></i></div><div class="raw-paste">Garchomp @ Choice Scarf\nAbility: Rough Skin\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Stone Edge\n- Swords Dance<span class="caret"></span></div></div></div><div class="hero-side them hero-join"><span class="hero-tag">◈ ¿Ya tienes código?</span><a class="btn btn-gold btn-join" href="#/unirse"><span class="join-ico">🔗</span><span>Unirme con código</span></a><p style="color:var(--muted);font-size:13px;max-width:32ch;margin:0">Pega el código de sala de tu rival. No verás su equipo hasta que subas el tuyo.</p></div></section>'));  app.querySelector('[data-act=create]').onclick=()=>{location.hash='#/constructor';setTimeout(()=>doCreate(true),80)};
-  const sr=document.getElementById('stat-rooms');
-  if(sr)sr.textContent=Store.myRooms().length;
 }
 
 function viewBuilder(){
@@ -758,13 +757,14 @@ function dragEv(e,bar,set,el){
   document.addEventListener('mousemove',move);
   document.addEventListener('mouseup',up);
 }
+function natHint(n){const m=NMOD[n]||[];if(!m[0])return '(neutra)';return '(+'+STAT_ES[m[0]]+'/-'+STAT_ES[m[1]]+')';}
 function slotHTML(s,i){
   if(!s.species)return '<div class="slot empty-slot" data-slot="'+i+'"><div class="empty-add">Slot vacío<div data-combo="species"></div></div></div>';
   const d=dexIndexCache[s.species]||{};
   const types=d.types||[];
   const tc=typeColor(types[0]||'normal');
   const forms=(d.forms||[]).filter(f=>f!==s.species);
-  return '<div class="slot filled " data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Forma</label><select data-form><option value="">—</option>'+forms.map(f=>'<option '+(f===s.form?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></div><div class="field"><label>Naturaleza</label><select data-nat><option value="">—</option>'+NATURES.map(n=>'<option '+(s.nature===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><input type="text" data-ability value="'+esc(s.ability||'')+'"></div></div>'+statsPanelHTML(s)+'<div class="field"><label>EVs <span style="color:var(--dim)">(máx 510, 252 c/u)</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="evgrid">'+STATS.map(k=>{const v=(s.evs&&s.evs[k])||0;const pct=Math.min(100,v/252*100);return '<span class="st">'+STAT_ES[k]+'</span><div class="evbar '+(v>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="evnum" data-ev="'+k+'" value="'+v+'">'}).join('')+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div><div class="field"><label>IVs</label><div class="ivrow">'+STATS.map(k=>'<div><label>'+STAT_ES[k]+'</label><input data-iv="'+k+'" value="'+((s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31)+'"></div>').join('')+'</div></div><div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<select data-mv="'+n+'"><option value="">— vacío —</option>'+(s.moves[n]?'<option selected>'+esc(s.moves[n])+'</option>':'')+'</select>').join('')+'</div><div class="qbtns"><button class="qbtn" data-addmv>➕ Movimiento</button></div></div></div></div>';
+  return '<div class="slot filled" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Forma</label><select data-form><option value="">—</option>'+forms.map(f=>'<option '+(f===s.form?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></div><div class="field"><label>Naturaleza</label><select data-nat><option value="">—</option>'+NATURES.map(n=>'<option value="'+n+'" '+(s.nature===n?'selected':'')+'>'+(NAT_ES[n]||n)+' '+natHint(n)+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><input type="text" data-ability value="'+esc(s.ability||'')+'"></div></div><div class="field"><label>Nivel</label><input type="number" min="1" max="100" data-lvl value="'+(s.level||100)+'" style="max-width:110px"></div>'+statsPanelHTML(s)+'<div class="field"><label>EVs <span style="color:var(--dim)">(máx 510, 252 c/u)</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="evgrid">'+STATS.map(k=>{const v=(s.evs&&s.evs[k])||0;const pct=Math.min(100,v/252*100);return '<span class="st">'+STAT_ES[k]+'</span><div class="evbar '+(v>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="evnum" data-ev="'+k+'" value="'+v+'">'}).join('')+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div><div class="field"><label>IVs</label><div class="ivrow">'+STATS.map(k=>'<div><label>'+STAT_ES[k]+'</label><input data-iv="'+k+'" value="'+((s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31)+'"></div>').join('')+'</div></div><div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<select data-mv="'+n+'"><option value="">— vacío —</option>'+(s.moves[n]?'<option selected>'+esc(s.moves[n])+'</option>':'')+'</select>').join('')+'</div><div class="qbtns"><button class="qbtn" data-addmv>➕ Movimiento</button></div></div></div></div>';
 }
 function renderSlots(){
   const box=document.getElementById('slots');
@@ -796,6 +796,8 @@ function renderSlots(){
     if(ns)ns.onchange=()=>{s.nature=ns.value;renderSlots();renderPreview()};
     const ab=el.querySelector('[data-ability]');
     if(ab)ab.oninput=()=>{s.ability=ab.value};
+    const lv=el.querySelector('[data-lvl]');
+    if(lv)lv.onchange=()=>{s.level=clamp(+lv.value||100,1,100);const sid=el.querySelector('.slot-id');if(sid)sid.textContent='#'+((dexIndexCache[s.species]&&dexIndexCache[s.species].id)||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size;STATS.forEach(k=>syncStatFinal(el,s,k));const pre=document.querySelector('.preview .raw-paste');if(pre)pre.textContent=exportTeam(sets.filter(x=>x.species));};
     el.querySelectorAll('[data-ev]').forEach(inp=>{
       const k=inp.dataset.ev;
       inp.oninput=()=>{setEV(s,k,+inp.value);syncEvUI(el,s,k);updateEvTotal()};
@@ -850,7 +852,6 @@ function renderSlots(){
     });
   });
 }
-
 function pasteRender(real){
   return '<div class="pp">'+real.map(s=>{
     const d=dexIndexCache[s.species]||{};
@@ -1001,8 +1002,9 @@ function renderRoomView(){
   if(!location.hash.startsWith('#/sala/'))return;
   app.innerHTML='';
   if(!room){
- const sr=document.getElementById('stat-rooms');
-  if(sr)sr.textContent=Store.myRooms().length;  }
+    app.appendChild(h('<div class="card"><h3>Esta sala no está cargada</h3><p style="color:var(--muted)">Entra desde <a href="#/unirse">Unirse</a> con el código.</p></div>'));
+    return;
+  }
   const editing=room.status!=='revealed';
   const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span>'+(editing?'<button class="btn btn-sm" id="ri">📥 Pegar paste</button><button class="btn btn-sm" id="re">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="rc">🗑 Limpiar</button>':'')+'<span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
   app.appendChild(top);
