@@ -59,8 +59,7 @@ h1,h2,h3,h4{font-family:var(--disp);font-weight:800;letter-spacing:-.02em;line-h
 .section-title::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line2),transparent)}
 
 /* hero split */
-.hero{display:grid;grid-template-columns:1.12fr .88fr;border:1px solid var(--line2);border-radius:20px;overflow:hidden;background:rgba(11,17,29,.82);box-shadow:var(--shadow);position:relative}
-.hero::after{content:"VS";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--disp);font-size:24px;font-weight:900;color:var(--gold);z-index:5;background:#0a0f1a;border:2px solid var(--gold);border-radius:50%;width:60px;height:60px;display:grid;place-items:center;box-shadow:0 0 0 10px rgba(10,15,26,.9),0 0 44px rgba(246,196,69,.35);animation:vspulse 3.4s ease-in-out infinite}
+.hero{display:grid;grid-template-columns:1fr;border:1px solid var(--line2);border-radius:20px;overflow:hidden;background:rgba(11,17,29,.82);box-shadow:var(--shadow);position:relative}.hero::after{display:none;content:"VS";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--disp);font-size:24px;font-weight:900;color:var(--gold);z-index:5;background:#0a0f1a;border:2px solid var(--gold);border-radius:50%;width:60px;height:60px;display:grid;place-items:center;box-shadow:0 0 0 10px rgba(10,15,26,.9),0 0 44px rgba(246,196,69,.35);animation:vspulse 3.4s ease-in-out infinite}
 @keyframes vspulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.09)}}
 .hero-side{padding:22px 24px 26px;min-height:470px;display:flex;flex-direction:column}
 .hero-side.you{background:linear-gradient(160deg,rgba(74,163,255,.09),transparent 55%)}

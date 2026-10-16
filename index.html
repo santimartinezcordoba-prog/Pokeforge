@@ -141,14 +141,22 @@ input:-webkit-autofill:focus{
   color:#e9eff9!important;
   transition:background-color 5000s ease-in-out 0s;
 }
+.hero{grid-template-columns:1.15fr .85fr!important}
+.hero::after{display:none!important}
+.hero-side.you .term{margin-top:18px}
+.hero-join{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.btn-join{display:flex!important;flex-direction:column;align-items:center;gap:12px;padding:30px 38px!important;font-size:21px!important;line-height:1.15;border-radius:18px!important;box-shadow:0 0 0 6px rgba(246,196,69,.08),0 18px 40px -16px rgba(246,196,69,.55)!important}
+.btn-join:hover{box-shadow:0 0 0 6px rgba(246,196,69,.15),0 24px 52px -16px rgba(246,196,69,.8)!important;transform:translateY(-3px)}
+.btn-join .join-ico{font-size:42px;line-height:1}
+.btn-join span:last-child{font-family:var(--disp);font-weight:900}
+@media(max-width:880px){.hero{grid-template-columns:1fr!important}.hero-side.them{border-left:0}}
 </style>
 </head>
 <body>
 <div class="bg" aria-hidden="true"><canvas id="spritefield"></canvas><div class="bg-grid"></div><div class="bg-glow"></div><div class="bg-scan"></div></div>
 <header class="topbar">
   <a class="wordmark" href="#/inicio"><span class="wm-mark"><svg viewBox="0 0 32 32" width="30" height="30"><circle cx="16" cy="16" r="13.5" fill="#0d1220" stroke="currentColor" stroke-width="2.4"/><path d="M2.6 16h26.8" stroke="currentColor" stroke-width="2.4"/><circle cx="16" cy="16" r="4.6" fill="#0d1220" stroke="currentColor" stroke-width="2.4"/></svg></span><span class="wm-text">CIEGA<b>·</b>PASTE</span><span class="wm-sub">intercambio a ciegas</span></a>
-  <nav class="mainnav"><a href="#/inicio" data-nav="inicio">Inicio</a><a href="#/constructor" data-nav="constructor">Constructor</a><a href="#/unirse" data-nav="unirse">Unirse</a><a href="#/dex" data-nav="dex">Pokédex</a><a href="#/salas" data-nav="salas">Mis salas</a><a href="#/ajustes" data-nav="ajustes" class="nav-ico">⚙</a></nav>
-  <form class="quickjoin" id="quickjoin" autocomplete="off"><input id="quickjoin-input" maxlength="16" placeholder="código de sala"><button type="submit">Unirse</button></form>
+  <nav class="mainnav"><a href="#/inicio" data-nav="inicio">Inicio</a><a href="#/constructor" data-nav="constructor">Constructor</a><a href="#/unirse" data-nav="unirse">Unirse</a><a href="#/dex" data-nav="dex">Pokédex</a><a href="#/ajustes" data-nav="ajustes" class="nav-ico">⚙</a></nav>  <form class="quickjoin" id="quickjoin" autocomplete="off"><input id="quickjoin-input" maxlength="16" placeholder="código de sala"><button type="submit">Unirse</button></form>
 </header>
 <main id="app" class="app"></main>
 <footer class="footer"><div class="f-left"><b>CIEGA·PASTE</b> · proyecto independiente, sin afiliación con Nintendo / Game Freak / The Pokémon Company.</div><div class="f-right">Sprites: Pokémon Showdown · Datos: PokeAPI · Formato: compatible con pokepaste.es</div></footer>
@@ -619,8 +627,7 @@ function combo(ph,items,onPick,render){
 let sets=[];
 let room=null;
 let pollTimer=null;
-const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,salas:viewRooms,ajustes:viewSettings,sala:renderRoomView};
-function nav(){
+const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};function nav(){
   const hash=(location.hash||'#/inicio').replace('#/','');
   const[name,...rest]=hash.split('/');
   document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
@@ -654,10 +661,7 @@ function joinRoom(code){
 
 function viewHome(){
   const app=document.getElementById('app');
-  app.appendChild(h('<section class="hero"><div class="hero-side you"><span class="hero-tag">◉ Tú · siempre visible</span><h2 class="hero-h">Sube tu equipo<br>a ciegas.</h2><p class="hero-p">Construye tu equipo con sprites reales, estilo pokepaste. Nadie lo verá… hasta que el rival suba el suyo.</p><div class="term"><div class="term-bar"><i></i><i></i><i></i></div><div class="raw-paste">Garchomp @ Choice Scarf\nAbility: Rough Skin\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Stone Edge\n- Swords Dance<span class="caret"></span></div></div><div class="hero-actions"><button class="btn btn-primary btn-lg" data-act="create">➕ Crear sala y publicar</button><a class="btn btn-ghost btn-lg" href="#/unirse">🔗 Unirme con código</a><a class="btn btn-ghost" href="#/dex">📖 Pokédex</a></div></div><div class="hero-side them"><span class="hero-tag">◈ Rival · bloqueado</span><div class="locked"><div class="padlock">🔒</div><h3>Sin acceso hasta el intercambio</h3><p>El equipo rival se revelará cuando ambos lo hayáis enviado.</p><div class="ghost-slots"><i></i><i></i><i></i><i></i><i></i><i></i></div></div></div></section>'));
-  app.appendChild(h('<div class="strip"><div><b>1025+</b><span>Pokémon</span></div><div><b>~2500</b><span>objetos</span></div><div><b>5</b><span>estilos sprite</span></div><div><b>100%</b><span>formato Showdown</span></div><div><b id="stat-rooms">0</b><span>tus salas</span></div></div>'));
-  app.appendChild(h('<h2 class="section-title">Cómo funciona</h2><div class="steps">'+[['1','Crear sala','Pulsa <span class="k">Crear sala</span>. Tu equipo queda sellado y se genera un <b>código corto</b>.'],['2','Pasar el código','Dale al rival el código. No puede ver nada todavía.'],['3','El rival se une','Introduce el código en <span class="k">Unirse</span> y sube su equipo.'],['4','Revelación mutua','En cuanto ambos enviáis, los equipos aparecen lado a lado con <b>análisis y counters</b>.']].map(x=>'<div class="step"><div class="step-n">'+x[0]+'</div><div><h3>'+x[1]+'</h3><p>'+x[2]+'</p></div></div>').join('')+'</div>'));
-  app.querySelector('[data-act=create]').onclick=()=>{location.hash='#/constructor';setTimeout(()=>doCreate(true),80)};
+  app.appendChild(h('<section class="hero"><div class="hero-side you"><span class="hero-tag">◉ Tú · siempre visible</span><h2 class="hero-h">Sube tu equipo<br>a ciegas.</h2><p class="hero-p">Construye tu equipo con sprites reales, estilo pokepaste. Nadie lo verá… hasta que el rival suba el suyo.</p><div class="hero-actions"><button class="btn btn-primary btn-lg" data-act="create">➕ Crear sala y publicar</button><a class="btn btn-lg" href="#/dex">📖 Pokédex</a></div><div class="term"><div class="term-bar"><i></i><i></i><i></i></div><div class="raw-paste">Garchomp @ Choice Scarf\nAbility: Rough Skin\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Stone Edge\n- Swords Dance<span class="caret"></span></div></div></div><div class="hero-side them hero-join"><span class="hero-tag">◈ ¿Ya tienes código?</span><a class="btn btn-gold btn-join" href="#/unirse"><span class="join-ico">🔗</span><span>Unirme con código</span></a><p style="color:var(--muted);font-size:13px;max-width:32ch;margin:0">Pega el código de sala de tu rival. No verás su equipo hasta que subas el tuyo.</p></div></section>'));  app.querySelector('[data-act=create]').onclick=()=>{location.hash='#/constructor';setTimeout(()=>doCreate(true),80)};
   const sr=document.getElementById('stat-rooms');
   if(sr)sr.textContent=Store.myRooms().length;
 }
@@ -994,9 +998,8 @@ function renderRoomView(){
   if(!location.hash.startsWith('#/sala/'))return;
   app.innerHTML='';
   if(!room){
-    app.appendChild(h('<div class="card"><h3>Esta sala no está cargada</h3><p style="color:var(--muted)">Entra desde <a href="#/unirse">Unirse</a> con el código.</p></div>'));
-    return;
-  }
+ const sr=document.getElementById('stat-rooms');
+  if(sr)sr.textContent=Store.myRooms().length;  }
   const editing=room.status!=='revealed';
   const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span>'+(editing?'<button class="btn btn-sm" id="ri">📥 Pegar paste</button><button class="btn btn-sm" id="re">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="rc">🗑 Limpiar</button>':'')+'<span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
   app.appendChild(top);
