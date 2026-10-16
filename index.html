@@ -574,6 +574,14 @@ async function getPokemonDetail(name){
   const cands=detailCandidates(name);
   let data=null;
   for(const c of cands){
+  const BASE_FORM = {
+  'oricorio':'oricorio-baile',
+  'maushold':'maushold-family',
+  'basculegion':'basculegion-f',
+  'tatsugiri':'tatsugiri-droopy',
+  'squawkabilly':'squawkabilly-plum'
+};
+let monName = BASE_FORM[name] || (name.startsWith('arceus-') ? 'arceus' : name);
     const r=await fetch('https://pokeapi.co/api/v2/pokemon/'+encodeURIComponent(slug(c))).then(x=>x.ok?x.json():null).catch(()=>null);
     if(r&&Array.isArray(r.stats)&&r.stats.length){data=r;break}
   }
