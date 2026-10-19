@@ -668,8 +668,7 @@ function combo(ph,items,onPick,render){
     if(op){onPick(list[+op.dataset.i]);pop.classList.remove('on')}
   });
   document.addEventListener('click',e=>{if(!wrap.contains(e.target))pop.classList.remove('on')});
-  return{el:wrap,input:inp,redraw:()=>{if(pop.classList.contains('on'))draw();}};}
-
+  return{el:wrap,input:inp,redraw:()=>{if(pop.classList.contains('on'))draw();},reload:()=>{if(document.activeElement===inp)fill(inp.value);}};}
 /* ================= APP ================= */
 let sets=[];
 let room=null;
@@ -866,7 +865,7 @@ function renderSlots(){
   box.querySelectorAll('[data-combo=species]').forEach(el=>{
     const i=+el.closest('.slot').dataset.slot;
     el.innerHTML='';
-    const cb=combo('Buscar Pokémon…',()=>DexCache.pokemon?DexCache.pokemon.map(p=>p.name):[],async name=>{
+    const cb=combo('Buscar Pokémon…',()=>DexCache.names||(DexCache.pokemon?DexCache.names=DexCache.pokemon.map(p=>p.name):[]),async name=>{
       const cur=sets[i]||{};
       const shiny=cur.shiny==null?Settings.shiny:cur.shiny;
       sets[i]=Object.assign(blank(),cur,{species:name,form:'',shiny});
@@ -876,13 +875,11 @@ function renderSlots(){
       renderPreview();
     },name=>{
       const d=dexIndexCache[name];
-      if(d)return '<span>'+esc(name)+'</span><span class="ty">'+d.types.map(miniType).join('')+'</span>';
-      getPokemonDetail(name).then(dd=>{if(dd){dexIndexCache[name]=dd;cb.redraw();}});
-      return '<span>'+esc(name)+'</span><span class="ty"></span>';
+      return '<span>'+esc(name)+'</span><span class="ty">'+(d?d.types.map(miniType).join(''):'')+'</span>';
     });
     el.appendChild(cb.el);
     cb.input.value=(sets[i]&&sets[i].species)||'';
-    loadPokemonIndex();
+    loadPokemonIndex().then(()=>{DexCache.names=null;cb.reload();});
   });
   box.querySelectorAll('[data-combo=item]').forEach(el=>{
     const i=+el.closest('.slot').dataset.slot;
