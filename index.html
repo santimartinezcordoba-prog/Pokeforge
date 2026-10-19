@@ -673,7 +673,7 @@ function combo(ph,items,onPick,render){
 let sets=[];
 let room=null;
 let pollTimer=null;
-const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};function nav(){
+let lastRenderedStatus=null;const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};function nav(){
   const hash=(location.hash||'#/inicio').replace('#/','');
   const[name,...rest]=hash.split('/');
   document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
@@ -1059,7 +1059,7 @@ async function refreshRoom(){
     if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;
     else renderRoomView();
     stopPoll();
-  }else if(location.hash.startsWith('#/sala/')){
+  }else if(location.hash.startsWith('#/sala/')&&room.status!==lastRenderedStatus){
     renderRoomView();
   }
 }
@@ -1080,8 +1080,8 @@ function renderRoomView(){
     app.appendChild(h('<div class="card"><h3>Esta sala no está cargada</h3><p style="color:var(--muted)">Entra desde <a href="#/unirse">Unirse</a> con el código.</p></div>'));
     return;
   }
-  const editing=room.status!=='revealed';
-  const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span>'+(editing?'<button class="btn btn-sm" id="ri">📥 Pegar paste</button><button class="btn btn-sm" id="re">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="rc">🗑 Limpiar</button>':'')+'<span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
+  lastRenderedStatus=room.status;
+  const editing=room.status!=='revealed';  const top=h('<div class="builder-top"><span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span><span class="badge badge-'+Store.mode+'">'+Store.mode+'</span>'+(editing?'<button class="btn btn-sm" id="ri">📥 Pegar paste</button><button class="btn btn-sm" id="re">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="rc">🗑 Limpiar</button>':'')+'<span style="flex:1"></span><button class="btn btn-sm btn-gold" id="sh">🔗 Compartir</button><button class="btn btn-sm" id="back">← Editor</button></div>');
   app.appendChild(top);
   top.querySelector('#sh').onclick=shareCode;
   top.querySelector('#back').onclick=()=>{location.hash='#/constructor'};
