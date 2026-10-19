@@ -673,7 +673,9 @@ function combo(ph,items,onPick,render){
 let sets=[];
 let room=null;
 let pollTimer=null;
-let lastRenderedStatus=null;const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};function nav(){
+let lastRenderedStatus=null;
+let openSlotOnRender=null;
+  const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};function nav(){
   const hash=(location.hash||'#/inicio').replace('#/','');
   const[name,...rest]=hash.split('/');
   document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
@@ -835,7 +837,7 @@ function renderSlots(){
   const wasOpen=new Set([...box.querySelectorAll('.slot.open')].map(x=>+x.dataset.slot));
   box.innerHTML=sets.map((s,i)=>slotHTML(s,i)).join('');
   wasOpen.forEach(i=>{const o=box.querySelector('[data-slot="'+i+'"]');if(o)o.classList.add('open')});
-  box.querySelectorAll('[data-slot]').forEach(el=>{
+  if(openSlotOnRender!=null){const o=box.querySelector('[data-slot="'+openSlotOnRender+'"]');if(o)o.classList.add('open');openSlotOnRender=null;}  box.querySelectorAll('[data-slot]').forEach(el=>{
     const i=+el.dataset.slot;
     const s=sets[i];
     const head=el.querySelector('.slot-head');
@@ -1114,17 +1116,19 @@ function buildReveal(){
   const mine=room.you||[],them=room.them||[];
   const wrap=h('<div class="vs-seam">VS · análisis cruzado</div><div class="reveal"></div>');
   const rev=wrap.querySelector('.reveal');
-  rev.appendChild(revealCol('🔵 Tu equipo',mine,them));
-  rev.appendChild(revealCol('🟡 Equipo rival',them,mine));
+  rev.appendChild(revealCol('🔵 Tu equipo',mine,them,true));
+  rev.appendChild(revealCol('🟡 Equipo rival',them,mine,false));
   return wrap;
 }
-function revealCol(title,team,enemy){
+function revealCol(title,team,enemy,editable){
   const col=h('<div class="reveal-col"><h3>'+title+'</h3><div class="rv-grid"></div></div>');
   const grid=col.querySelector('.rv-grid');
   team.forEach((s,i)=>{
     const d=dexIndexCache[s.species]||{};
     const types=d.types||[];
-    grid.appendChild(h('<div class="rv-card" style="animation-delay:'+(i*0.07)+'s"><div class="spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="nm">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+'</div><div class="it">'+itemImg(s.item)+esc(s.item||'—')+'</div><div class="types">'+types.map(typeChip).join('')+'</div><div class="mvs">'+(s.moves||[]).filter(Boolean).map(esc).join(' · ')+'</div></div>'));
+    const card=h('<div class="rv-card" style="animation-delay:'+(i*0.07)+'s;cursor:pointer"><div class="spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="nm">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+'</div><div class="it">'+itemImg(s.item)+esc(s.item||'—')+'</div><div class="types">'+types.map(typeChip).join('')+'</div><div class="mvs">'+(s.moves||[]).filter(Boolean).map(esc).join(' · ')+'</div></div>');
+    card.onclick=()=>{ if(editable){ openSlotOnRender=i; location.hash='#/constructor'; } else { modal(esc(s.species), pasteRender([s])); } };
+    grid.appendChild(card);
   });
   if(enemy&&enemy.length){
     const cs=bestCounters(team,enemy,dexIndexCache);
