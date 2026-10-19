@@ -69,8 +69,7 @@ h1,h2,h3,h4{font-family:var(--disp);font-weight:800;letter-spacing:-.02em;line-h
 .seg{display:flex;border:1px solid var(--line2);border-radius:10px;overflow:hidden}.seg button{background:transparent;border:0;padding:7px 13px;cursor:pointer;font-weight:800;font-size:13px;color:var(--muted)}.seg button.on{background:var(--accent);color:#04101f}
 .evbudget{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--muted)}.evbudget b{color:var(--ok)}.evbudget.over b{color:var(--bad)}
 .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:16px}
-.slot{border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(180deg,var(--panel),#0f1626);overflow:hidden;position:relative;transition:border-color .2s,transform .18s}.slot::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tc,var(--line2))}.slot:hover{border-color:var(--line2);transform:translateY(-2px)}.slot:hover::before{width:6px}.slot.filled::before{background:var(--tc);box-shadow:0 0 22px -2px var(--tc)}
-.slot-head{display:flex;align-items:center;gap:11px;padding:11px 12px 11px 16px;cursor:pointer;user-select:none}.slot-head:hover{background:rgba(255,255,255,.026)}
+.slot{border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(180deg,var(--panel),#0f1626);position:relative;transition:border-color .2s,transform .18s}.slot-head{display:flex;align-items:center;gap:11px;padding:11px 12px 11px 16px;cursor:pointer;user-select:none}.slot-head:hover{background:rgba(255,255,255,.026)}
 .slot-spr{width:56px;height:56px;flex:0 0 56px;display:grid;place-items:center;background:radial-gradient(circle at 50% 60%,rgba(255,255,255,.07),transparent 70%);border-radius:10px}.slot-spr img{max-width:100%;max-height:100%;image-rendering:pixelated;filter:drop-shadow(0 4px 8px rgba(0,0,0,.6));animation:pop .35s cubic-bezier(.2,1.4,.4,1)}
 @keyframes pop{from{transform:scale(.4) translateY(8px);opacity:0}to{transform:none;opacity:1}}
 .slot-id{font-family:var(--mono);font-size:11px;color:var(--dim)}.slot-name{font-family:var(--disp);font-size:15.5px;font-weight:700}.slot-item{font-size:12px;color:var(--gold);display:flex;align-items:center;gap:5px}.slot-item img{width:15px;height:15px;image-rendering:pixelated}
@@ -84,7 +83,7 @@ select,input[type=text],input[type=number],textarea{width:100%;background:#0c122
 select:focus,input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,163,255,.14)}
 textarea{font-family:var(--mono);resize:vertical;min-height:260px;line-height:1.7}
 .combo{position:relative}.combo-face{display:flex;align-items:center;gap:8px;background:#0c1220;border:1px solid var(--line2);border-radius:9px;padding:2px 6px 2px 8px}.combo-face:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(74,163,255,.14)}.combo-face img{width:26px;height:26px;image-rendering:pixelated;flex:0 0 26px}.combo-face input{border:0;background:transparent;padding:7px 2px;box-shadow:none!important}
-.combo-pop{position:absolute;z-index:80;top:calc(100% + 6px);left:0;right:0;max-height:280px;overflow:auto;background:#0b111d;border:1px solid var(--line2);border-radius:11px;box-shadow:0 22px 44px -12px #000;display:none}.combo-pop.on{display:block}
+.combo-pop{position:absolute;z-index:999;top:calc(100% + 6px);left:0;right:0;max-height:280px;overflow:auto;background:#0b111d;border:1px solid var(--line2);border-radius:11px;box-shadow:0 22px 44px -12px #000;display:none}.combo-pop.on{display:block}
 .combo-op{display:flex;align-items:center;gap:9px;padding:7px 10px;cursor:pointer;font-size:13.5px;border-left:3px solid transparent}.combo-op img{width:28px;height:28px;image-rendering:pixelated}.combo-op.sel{background:#16243c;border-left-color:var(--accent)}.combo-op .ty{margin-left:auto;display:flex;gap:4px}
 .mini-type{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;color:#04070d}
 .evgrid{display:grid;grid-template-columns:auto 1fr auto;gap:5px 9px;align-items:center;font-family:var(--mono);font-size:12px}.evgrid .st{color:var(--muted);width:34px;font-weight:600}
@@ -151,6 +150,23 @@ input:-webkit-autofill:focus{
 .btn-join span:last-child{font-family:var(--disp);font-weight:900}
 @media(max-width:880px){.hero{grid-template-columns:1fr!important}.hero-side.them{border-left:0}}
 .slot{align-self:start!important}
+.sdt{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:12px}
+.sdtrow{display:grid;grid-template-columns:42px 46px 1fr 46px 54px;gap:4px 6px;align-items:center;padding:2px 4px;border-radius:6px;background:#0c1220}
+.sdtrow:nth-child(even){background:#0a0f1a}
+.sdthead{display:grid;grid-template-columns:42px 46px 1fr 46px 54px;gap:4px 6px;font-size:10px;color:var(--dim);text-align:center;padding:0 4px}
+.sdthead span:first-child{text-align:left}
+.sn{color:var(--muted);font-weight:600}
+.sdtin{width:100%;text-align:center;background:#060a12;border:1px solid var(--line);border-radius:5px;padding:3px 2px;font-family:var(--mono);font-size:12px;color:inherit}
+.sdtfin{text-align:right;color:var(--gold);font-weight:600}
+.sdt{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:12px}
+.sdtrow{display:grid;grid-template-columns:42px 46px 1fr 46px 54px;gap:4px 6px;align-items:center;padding:2px 4px;border-radius:6px;background:#0c1220}
+.sdtrow:nth-child(even){background:#0a0f1a}
+.sdthead{display:grid;grid-template-columns:42px 46px 1fr 46px 54px;gap:4px 6px;font-size:10px;color:var(--dim);text-align:center;padding:0 4px}
+.sdthead span:first-child{text-align:left}
+.sn{color:var(--muted);font-weight:600}
+.sdtin{width:100%;text-align:center;background:#060a12;border:1px solid var(--line);border-radius:5px;padding:3px 2px;font-family:var(--mono);font-size:12px;color:inherit}
+.sdtfin{text-align:right;color:var(--gold);font-weight:600}
+.slot::before{border-radius:14px 0 0 14px}
 </style>
 </head>
 <body>
@@ -562,6 +578,35 @@ async function loadItemIndex(){
   try{localStorage.setItem('cpaste.dex.i',JSON.stringify(DexCache.items))}catch(e){}
   return DexCache.items;
 }
+async function loadAbilityIndex(){
+  if(DexCache.abilities)return DexCache.abilities;
+  const c=localStorage.getItem('cpaste.dex.a');
+  if(c){try{DexCache.abilities=JSON.parse(c);return DexCache.abilities}catch(e){}}
+  const r=await fetch('https://pokeapi.co/api/v2/ability?limit=1000').then(x=>x.json()).catch(()=>({results:[]}));
+  DexCache.abilities=(r.results||[]).map(x=>x.name.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '));
+  try{localStorage.setItem('cpaste.dex.a',JSON.stringify(DexCache.abilities))}catch(e){}
+  return DexCache.abilities;
+}
+async function loadMoveIndex(){
+  if(DexCache.moves)return DexCache.moves;
+  const ZM=new Set(['breakneckblitz','alloutpummeling','supersonicskystrike','aciddownpour','tectonicrage','continentalcrush','savagespinarrow','neverendingnightmare','corkscrewcrash','infernooverdrive','hydrovortex','bloomdoom','gigavolthavoc','shatteredpsyche','subzeroslammer','devastatingdrake','blackholeeclipse','twinkletackle','pulverizingpancake','extremeevoboost','genessupernova','10000000voltthunderbolt','letssnuggleforever','splinteredstormshards','clangoroussoulblaze','maliciousmoonsault','soulheartstealing7starmirage']);
+  const norm=s=>s.toLowerCase().replace(/[^a-z0-9]/g,'');
+  let arr=null;
+  const c=localStorage.getItem('cpaste.dex.m');
+  if(c){try{arr=JSON.parse(c)}catch(e){}}
+  if(!arr||!arr.length){
+    arr=[];
+    for(let off=0;off<1200;off+=500){
+      const r=await fetch('https://pokeapi.co/api/v2/move?limit=500&offset='+off).then(x=>x.json()).catch(()=>({results:[]}));
+      arr.push(...(r.results||[]).map(m=>m.name.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')));
+      if(!r.results||r.results.length<500)break;
+    }
+  }
+  arr=arr.filter(n=>!ZM.has(norm(n)));
+  DexCache.moves=arr;
+  try{localStorage.setItem('cpaste.dex.m',JSON.stringify(arr))}catch(e){}
+  return DexCache.moves;
+}
 function detailCandidates(name){
   const out=[];
   const add=x=>{x=String(x||'').trim();if(x&&!out.includes(x))out.push(x)};
@@ -592,7 +637,8 @@ async function getPokemonDetail(name){
   for(const s of data.stats)stats[normKey(s.stat.name)||s.stat.name]=s.base_stat;
   const types=(data.types||[]).sort((a,b)=>a.slot-b.slot).map(t=>t.type.name);
   const forms=(data.forms||[]).map(f=>f.name);
-  const d={name:data.name,id:data.id,stats,types,forms};
+  const abilities=(data.abilities||[]).sort((a,b)=>a.slot-b.slot).map(a=>a.ability.name.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '));
+  const d={name:data.name,id:data.id,stats,types,forms,abilities};
   DexCache.details[name]=d;
   if(data.name&&data.name!==name)DexCache.details[data.name]=d;
   return d;
@@ -622,8 +668,7 @@ function combo(ph,items,onPick,render){
     if(op){onPick(list[+op.dataset.i]);pop.classList.remove('on')}
   });
   document.addEventListener('click',e=>{if(!wrap.contains(e.target))pop.classList.remove('on')});
-  return{el:wrap,input:inp};
-}
+  return{el:wrap,input:inp,redraw:()=>{if(pop.classList.contains('on'))draw();}};}
 
 /* ================= APP ================= */
 let sets=[];
@@ -696,15 +741,11 @@ function viewBuilder(){
 function statsPanelHTML(s){
   const d=dexIndexCache[s.species];
   if(!d)return '<div class="field"><label>Estadísticas</label><div class="stats-load">cargando datos…</div></div>';
-  const lvl=s.level||100;
   const rows=STATS.map(k=>{
     const base=d.stats[k]||0;
-    const iv=(s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31;
-    const ev=(s.evs&&s.evs[k])||0;
-    const fin=finalStat(base,k,iv,ev,s.nature,lvl);
-    return '<div class="statrow"><span class="sl">'+STAT_ES[k]+'</span><span class="sb">'+base+'</span><span class="sbar"><i style="width:'+Math.min(100,base/255*100)+'%;background:'+statColor(base)+'"></i></span><span class="sf" data-sf="'+k+'">'+fin+'</span></div>';
+    return '<div class="statrow"><span class="sl">'+STAT_ES[k]+'</span><span class="sb">'+base+'</span><span class="sbar"><i style="width:'+Math.min(100,base/255*100)+'%;background:'+statColor(base)+'"></i></span></div>';
   }).join('');
-  return '<div class="field"><label>Estadísticas <span style="color:var(--dim)">base · final (Nv '+lvl+')</span></label><div class="statgrid">'+rows+'</div></div>';
+  return '<div class="field"><label>Estadísticas base</label><div class="statgrid">'+rows+'</div></div>';
 }
 function syncStatFinal(el,s,k){
   const d=dexIndexCache[s.species];
@@ -757,14 +798,31 @@ function dragEv(e,bar,set,el){
   document.addEventListener('mousemove',move);
   document.addEventListener('mouseup',up);
 }
-function natHint(n){const m=NMOD[n]||[];if(!m[0])return '(neutra)';return '(+'+STAT_ES[m[0]]+'/-'+STAT_ES[m[1]]+')';}
+function natHint(n){const EN={atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};const m=NMOD[n]||[];if(!m[0])return '(neutral)';return '(+'+(EN[m[0]]||m[0])+'/-'+(EN[m[1]]||m[1])+')';}
 function slotHTML(s,i){
   if(!s.species)return '<div class="slot empty-slot" data-slot="'+i+'"><div class="empty-add">Slot vacío<div data-combo="species"></div></div></div>';
   const d=dexIndexCache[s.species]||{};
   const types=d.types||[];
   const tc=typeColor(types[0]||'normal');
-  const forms=(d.forms||[]).filter(f=>f!==s.species);
-  return '<div class="slot filled" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Forma</label><select data-form><option value="">—</option>'+forms.map(f=>'<option '+(f===s.form?'selected':'')+'>'+esc(f)+'</option>').join('')+'</select></div><div class="field"><label>Naturaleza</label><select data-nat><option value="">—</option>'+NATURES.map(n=>'<option value="'+n+'" '+(s.nature===n?'selected':'')+'>'+(NAT_ES[n]||n)+' '+natHint(n)+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><input type="text" data-ability value="'+esc(s.ability||'')+'"></div></div><div class="field"><label>Nivel</label><input type="number" min="1" max="100" data-lvl value="'+(s.level||100)+'" style="max-width:110px"></div>'+statsPanelHTML(s)+'<div class="field"><label>EVs <span style="color:var(--dim)">(máx 510, 252 c/u)</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="evgrid">'+STATS.map(k=>{const v=(s.evs&&s.evs[k])||0;const pct=Math.min(100,v/252*100);return '<span class="st">'+STAT_ES[k]+'</span><div class="evbar '+(v>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="evnum" data-ev="'+k+'" value="'+v+'">'}).join('')+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div><div class="field"><label>IVs</label><div class="ivrow">'+STATS.map(k=>'<div><label>'+STAT_ES[k]+'</label><input data-iv="'+k+'" value="'+((s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31)+'"></div>').join('')+'</div></div><div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<select data-mv="'+n+'"><option value="">— vacío —</option>'+(s.moves[n]?'<option selected>'+esc(s.moves[n])+'</option>':'')+'</select>').join('')+'</div><div class="qbtns"><button class="qbtn" data-addmv>➕ Movimiento</button></div></div></div></div>';
+  const lvl=s.level||100;
+  const rows=STATS.map(k=>{
+    const base=(d.stats&&d.stats[k])||0;
+    const iv=(s.ivs&&s.ivs[k]!=null)?s.ivs[k]:31;
+    const ev=(s.evs&&s.evs[k])||0;
+    const fin=d.stats?finalStat(base,k,iv,ev,s.nature,lvl):'—';
+    const pct=Math.min(100,ev/252*100);
+    return '<div class="sdtrow"><span class="sn">'+STAT_ES[k]+'</span><input class="sdtin" data-ev="'+k+'" value="'+ev+'"><div class="evbar '+(ev>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="sdtin" data-iv="'+k+'" value="'+iv+'"><span class="sdtfin" data-sf="'+k+'">'+fin+'</span></div>';
+  }).join('');
+  const table='<div class="field"><label>EVs / IVs <span style="color:var(--dim)">· máx 510, 252 c/u</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="sdthead"><span>Stat</span><span>EV</span><span></span><span>IV</span><span>final</span></div><div class="sdt">'+rows+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div>';
+  return '<div class="slot filled" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Nivel</label><input type="number" min="1" max="100" data-lvl value="'+(s.level||100)+'"></div><div class="field"><label>Naturaleza</label><select data-nat style="font-size:11px"><option value="">—</option>'+NATURES.map(n=>'<option value="'+n+'" '+(s.nature===n?'selected':'')+' style="font-size:13px">'+n+' '+natHint(n)+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><div data-combo="ability"></div></div></div>'+statsPanelHTML(s)+table+'<div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<div data-combo="move" data-mvi="'+n+'"></div>').join('')+'</div></div></div></div>';}
+function statsPanelHTML(s){
+  const d=dexIndexCache[s.species];
+  if(!d)return '<div class="field"><label>Estadísticas</label><div class="stats-load">cargando datos…</div></div>';
+  const rows=STATS.map(k=>{
+    const base=d.stats[k]||0;
+    return '<div class="statrow"><span class="sl">'+STAT_ES[k]+'</span><span class="sb">'+base+'</span><span class="sbar"><i style="width:'+Math.min(100,base/255*100)+'%;background:'+statColor(base)+'"></i></span></div>';
+  }).join('');
+  return '<div class="field"><label>Estadísticas base</label><div class="statgrid">'+rows+'</div></div>';
 }
 function renderSlots(){
   const box=document.getElementById('slots');
@@ -794,8 +852,6 @@ function renderSlots(){
     if(fs)fs.onchange=()=>{s.form=fs.value;renderSlots();renderPreview()};
     const ns=el.querySelector('[data-nat]');
     if(ns)ns.onchange=()=>{s.nature=ns.value;renderSlots();renderPreview()};
-    const ab=el.querySelector('[data-ability]');
-    if(ab)ab.oninput=()=>{s.ability=ab.value};
     const lv=el.querySelector('[data-lvl]');
     if(lv)lv.onchange=()=>{s.level=clamp(+lv.value||100,1,100);const sid=el.querySelector('.slot-id');if(sid)sid.textContent='#'+((dexIndexCache[s.species]&&dexIndexCache[s.species].id)||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size;STATS.forEach(k=>syncStatFinal(el,s,k));const pre=document.querySelector('.preview .raw-paste');if(pre)pre.textContent=exportTeam(sets.filter(x=>x.species));};
     el.querySelectorAll('[data-ev]').forEach(inp=>{
@@ -805,9 +861,6 @@ function renderSlots(){
     });
     el.querySelectorAll('[data-evbar]').forEach(bar=>bar.onmousedown=e=>dragEv(e,bar,s,el));
     el.querySelectorAll('[data-iv]').forEach(inp=>inp.oninput=()=>{s.ivs[inp.dataset.iv]=clamp(+inp.value||0,0,31);syncStatFinal(el,s,inp.dataset.iv)});
-    el.querySelectorAll('[data-mv]').forEach(sel=>sel.onchange=()=>{s.moves[+sel.dataset.mv]=sel.value;renderSlots();renderPreview()});
-    const am=el.querySelector('[data-addmv]');
-    if(am)am.onclick=()=>{if(s.moves.length<4){s.moves.push('');renderSlots();renderPreview()}};
     el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{Object.keys(s.evs).forEach(k=>delete s.evs[k]);if(b.dataset.q==='252'){s.evs.atk=252;s.evs.spe=252;s.evs.def=4}renderSlots();renderPreview()});
   });
   box.querySelectorAll('[data-combo=species]').forEach(el=>{
@@ -823,7 +876,9 @@ function renderSlots(){
       renderPreview();
     },name=>{
       const d=dexIndexCache[name];
-      return '<span>'+esc(name)+'</span><span class="ty">'+(d?d.types.map(miniType).join(''):'')+'</span>';
+      if(d)return '<span>'+esc(name)+'</span><span class="ty">'+d.types.map(miniType).join('')+'</span>';
+      getPokemonDetail(name).then(dd=>{if(dd){dexIndexCache[name]=dd;cb.redraw();}});
+      return '<span>'+esc(name)+'</span><span class="ty"></span>';
     });
     el.appendChild(cb.el);
     cb.input.value=(sets[i]&&sets[i].species)||'';
@@ -841,6 +896,37 @@ function renderSlots(){
     cb.input.value=(sets[i]&&sets[i].item)||'';
     loadItemIndex();
   });
+    box.querySelectorAll('[data-combo=ability]').forEach(el=>{
+    const i=+el.closest('.slot').dataset.slot;
+    el.innerHTML='';
+    const cb=combo('Buscar habilidad…',()=>{
+      const cur=(sets[i]||{}).species;
+      const own=(dexIndexCache[cur]&&dexIndexCache[cur].abilities)||[];
+      const all=DexCache.abilities||[];
+      const seen=new Set(own);
+      return own.concat(all.filter(a=>!seen.has(a)));
+    },name=>{
+      sets[i].ability=name;
+      renderSlots();
+      renderPreview();
+    },name=>'<span>'+esc(name)+'</span>');
+    el.appendChild(cb.el);
+    cb.input.value=(sets[i]&&sets[i].ability)||'';
+    loadAbilityIndex();
+  });
+    box.querySelectorAll('[data-combo=move]').forEach(el=>{
+    const i=+el.closest('.slot').dataset.slot;
+    const mv=+el.dataset.mvi;
+    el.innerHTML='';
+    const cb=combo('Buscar movimiento…',()=>DexCache.moves||[],name=>{
+      sets[i].moves[mv]=name;
+      renderSlots();
+      renderPreview();
+    },name=>'<span>'+esc(name)+'</span>');
+    el.appendChild(cb.el);
+    cb.input.value=(sets[i]&&sets[i].moves[mv])||'';
+    loadMoveIndex();
+  });
   updateEvTotal();
   sets.forEach((s,i)=>{
     if(s.species&&!dexIndexCache[s.species])getPokemonDetail(s.species).then(d=>{
@@ -851,14 +937,6 @@ function renderSlots(){
       }
     });
   });
-}
-function pasteRender(real){
-  return '<div class="pp">'+real.map(s=>{
-    const d=dexIndexCache[s.species]||{};
-    const types=d.types||[];
-    const tc=typeColor(types[0]||'normal');
-    return '<div class="pp-set" style="--tc:'+tc+'"><div class="pp-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="pp-lines"><div class="ln-name">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+(s.nickname?' <span class="par">('+esc(s.nickname)+')</span>':s.gender?' <span class="par">('+s.gender+')</span>':'')+(s.item?' <span class="ln-item">@ '+esc(s.item)+'</span>':'')+'</div>'+(s.ability?'<div class="ln-ab">Ability: <b>'+esc(s.ability)+'</b></div>':'')+(s.tera?'<div class="ln-meta">Tera Type: '+esc(s.tera)+'</div>':'')+(s.level&&s.level!==100?'<div class="ln-meta">Level: '+s.level+'</div>':'')+(fmtStats(s.evs)?'<div class="ln-ev">EVs: <b>'+esc(fmtStats(s.evs))+'</b></div>':'')+(fmtStats(s.ivs)?'<div class="ln-iv">IVs: '+esc(fmtStats(s.ivs))+'</div>':'')+(s.nature?'<div class="ln-nat">'+esc(s.nature)+' Nature</div>':'')+(s.moves||[]).filter(Boolean).map(m=>'<div class="ln-mv">'+esc(m)+'<span class="dot" style="background:'+typeColor(guessMoveType(m,types))+'"></span></div>').join('')+'</div></div>';
-  }).join('')+'</div>';
 }
 function renderPreview(){
   const box=document.getElementById('preview');
