@@ -925,7 +925,8 @@ function renderSlots(){
     loadPokemonIndex().then(()=>{DexCache.names=null;cb.reload();});
   });
   box.querySelectorAll('[data-combo=item]').forEach(el=>{
-    const i=+el.closest('.slot').dataset.slot;
+    const slotEl=el.closest('.slot');
+    const i=+slotEl.dataset.slot;
     el.innerHTML='';
     const cb=combo('Buscar objeto…',()=>DexCache.items||[],name=>{
       sets[i].item=name;
@@ -934,6 +935,13 @@ function renderSlots(){
     },name=>'<span>'+esc(name)+'</span>');
     el.appendChild(cb.el);
     cb.input.value=(sets[i]&&sets[i].item)||'';
+    cb.input.addEventListener('input',()=>{
+      const v=cb.input.value.trim();
+      sets[i].item=v;
+      const it=slotEl.querySelector('.slot-item');
+      if(it)it.innerHTML=itemImg(v)+esc(v||'Sin objeto');
+      renderPreview();
+    });
     loadItemIndex();
   });
   box.querySelectorAll('[data-combo=ability]').forEach(el=>{
