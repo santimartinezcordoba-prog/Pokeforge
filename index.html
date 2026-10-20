@@ -725,6 +725,7 @@ function viewHome(){
 
 function viewBuilder(){
   const app=document.getElementById('app');
+  app.innerHTML='';
   const tb=h('<div class="builder-top">'+(room?'<span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span>':'<span class="badge badge-host">Borrador</span>')+'<div class="seg" id="segsize">'+[1,2,3,4,5,6].map(n=>'<button data-n="'+n+'" class="'+(Settings.size===n?'on':'')+'">'+n+'</button>').join('')+'</div><button class="btn btn-sm" id="btn-import">📥 Pegar paste</button><button class="btn btn-sm" id="btn-export">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="btn-clear">🗑 Limpiar</button>'+(room?'<button class="btn btn-sm btn-gold" id="btn-share">🔗 Compartir</button>':'')+'<span class="evbudget" id="evb"></span><button class="btn btn-primary" id="btn-publish">'+(room?(room.role==='host'?'↻ Actualizar':'🔓 Enviar y desbloquear'):'➕ Crear sala y publicar')+'</button></div>');
   app.appendChild(tb);
   if(room)app.appendChild(h('<div class="card" style="margin:14px 0;text-align:center"><div style="font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase">Código de sala · pásalo al rival</div><div class="code-box" style="margin:10px 0">'+room.id+'</div><button class="btn btn-sm" id="cpc">📋 Copiar código</button></div>'));
