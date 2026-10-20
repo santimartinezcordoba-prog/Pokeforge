@@ -1157,7 +1157,7 @@ function revealCol(title,team,enemy,editable){
   team.forEach((s,i)=>{
     const d=dexIndexCache[s.species]||{};
     const types=d.types||[];
-    const card=h('<div class="rv-card" style="animation-delay:'+(i*0.07)+'s;cursor:pointer"><div class="spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="nm">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+'</div><div class="it">'+itemImg(s.item)+esc(s.item||'—')+'</div><div class="types">'+types.map(typeChip).join('')+'</div><div class="mvs">'+(s.moves||[]).filter(Boolean).map(esc).join(' · ')+'</div></div>');
+    const card=h('<div class="rv-card" style="animation-delay:'+(i*0.07)+'s;cursor:pointer"><div class="spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="nm">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+(s.nickname?esc(s.nickname)+' <span style="color:var(--dim)">('+esc(s.species)+')</span>':esc(s.species))+'</div><div class="it">'+itemImg(s.item)+esc(s.item||'—')+'</div><div class="types">'+types.map(typeChip).join('')+'</div><div class="mvs">'+(s.moves||[]).filter(Boolean).map(esc).join(' · ')+'</div></div>');
     card.onclick=()=>{ if(editable){ openSlotOnRender=i; location.hash='#/constructor'; } else { modal(esc(s.species), pasteRender([s])); } };
     grid.appendChild(card);
   });
