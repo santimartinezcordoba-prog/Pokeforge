@@ -248,9 +248,17 @@ function spritePokeAPI(n,sh){
 }
 function itemShowdown(n){return SD+'/itemicons/'+slug(n).replace(/-/g,'')+'.png'}
 function itemPokeAPI(n){return 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/'+slug(n)+'.png'}
+function canonSpecies(t){
+  const sl=slug(t);
+  if(!sl)return '';
+  const p=(DexCache.pokemon||[]).find(x=>x.name===sl);
+  if(p)return p.name;
+  for(const k in dexIndexCache){if(slug(k)===sl&&dexIndexCache[k]&&dexIndexCache[k].id)return k;}
+  return '';
+}
 function idByName(name){
   const raw=String(name||'').trim();
-  if(!raw)return 1;
+  if(!raw)return null;
   const sl=slug(raw);
   if(DexCache.details[raw]&&DexCache.details[raw].id)return DexCache.details[raw].id;
   if(DexCache.details[sl]&&DexCache.details[sl].id)return DexCache.details[sl].id;
@@ -266,7 +274,7 @@ function idByName(name){
   }
   const num=Number(raw);
   if(num)return num;
-  return 1;
+  return null;
 }
 function spriteCandidates(n,f){
   const out=[];
@@ -888,10 +896,10 @@ function renderSlots(){
     el.querySelectorAll('[data-iv]').forEach(inp=>inp.oninput=()=>{s.ivs[inp.dataset.iv]=clamp(+inp.value||0,0,31);syncStatFinal(el,s,inp.dataset.iv)});
     el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{Object.keys(s.evs).forEach(k=>delete s.evs[k]);if(b.dataset.q==='252'){s.evs.atk=252;s.evs.spe=252;s.evs.def=4}renderSlots();renderPreview()});
   });
-  box.querySelectorAll('[data-combo=species]').forEach(el=>{
+    box.querySelectorAll('[data-combo=species]').forEach(el=>{
     const i=+el.closest('.slot').dataset.slot;
     el.innerHTML='';
-    const cb=combo('Buscar Pokémon…',()=>DexCache.names||(DexCache.pokemon?DexCache.names=DexCache.pokemon.map(p=>p.name):[]),async name=>{
+    const pick=async name=>{
       const cur=sets[i]||{};
       const shiny=cur.shiny==null?Settings.shiny:cur.shiny;
       sets[i]=Object.assign(blank(),cur,{species:name,form:'',shiny});
@@ -899,12 +907,21 @@ function renderSlots(){
       if(d)dexIndexCache[name]=d;
       renderSlots();
       renderPreview();
-    },name=>{
+    };
+    const cb=combo('Buscar Pokémon…',()=>DexCache.names||(DexCache.pokemon?DexCache.names=DexCache.pokemon.map(p=>p.name):[]),pick,name=>{
       const d=dexIndexCache[name];
       return '<span>'+esc(name)+'</span><span class="ty">'+(d?d.types.map(miniType).join(''):'')+'</span>';
     });
     el.appendChild(cb.el);
     cb.input.value=(sets[i]&&sets[i].species)||'';
+    cb.input.addEventListener('blur',()=>{
+      const raw=cb.input.value.trim();
+      if(!raw)return;
+      const cur=sets[i]&&sets[i].species;
+      if(cur&&slug(cur)===slug(raw))return;
+      const canon=canonSpecies(raw);
+      if(canon&&canon!==cur)pick(canon);
+    });
     loadPokemonIndex().then(()=>{DexCache.names=null;cb.reload();});
   });
   box.querySelectorAll('[data-combo=item]').forEach(el=>{
