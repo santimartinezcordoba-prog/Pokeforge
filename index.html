@@ -409,7 +409,7 @@ function parseTeam(text){
   const lines=String(text||'').replace(/\r/g,'').split('\n');
   const sets=[];
   let cur=null;
-  const flush=()=>{if(cur&&(cur.species||cur.moves.length))sets.push(cur);cur=null};
+  const flush=()=>{if(cur&&cur.species)sets.push(cur);cur=null};
   for(const raw of lines){
     const t=raw.trim();
     if(!t)continue;
@@ -422,8 +422,8 @@ function parseTeam(text){
     if(/^EVs?\s*:/i.test(t)){if(!cur)cur=blank();cur.evs=parseStatLine(t.replace(/^EVs?\s*:/i,''));continue}
     if(/^IVs?\s*:/i.test(t)){if(!cur)cur=blank();cur.ivs=parseStatLine(t.replace(/^IVs?\s*:/i,''));continue}
     if(/Nature$/i.test(t)){if(!cur)cur=blank();cur.nature=t.replace(/\s*Nature$/i,'').trim();continue}
-    if(cur&&(cur.moves.length||Object.keys(cur.evs).length||cur.nature||cur.ability||cur.shiny)){flush();cur=blank();parseHeader(t,cur);continue}
-    if(t.includes('@')||t.includes('(')||!cur){flush();cur=blank();parseHeader(t,cur);continue}
+    // ninguna línea de metadato → es cabecera de set
+    flush();cur=blank();parseHeader(t,cur);
   }
   flush();
   return sets.filter(s=>s.species);
