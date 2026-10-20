@@ -376,7 +376,18 @@ function parseHeader(str,s){
   }
   const parens=[...str.matchAll(/\(([^)]*)\)/g)].map(m=>m[1]);
   str=str.replace(/\([^)]*\)/g,'').trim();
+  const names=DexCache.pokemon?new Set(DexCache.pokemon.map(p=>p.name)):null;
+  const isPoke=r=>{if(!r)return false;const sl=slug(r);if(names&&names.has(sl))return true;const d=dexIndexCache[r]||dexIndexCache[sl];return !!(d&&d.id)};
   const base=slug(str), part=base.includes('-')?base.split('-')[1]:'';
+  if(!isPoke(str)&&parens.length){
+    const pi=parens.findIndex(p=>!/^[MFN]$/i.test(p)&&isPoke(p));
+    if(pi>-1){
+      if(str)s.nickname=str;
+      s.species=parens[pi];
+      for(const p of parens)if(/^[MFN]$/i.test(p))s.gender=p.toUpperCase();
+      return;
+    }
+  }
   for(const p of parens){
     const pp=String(p).trim();
     if(/^[MFN]$/i.test(pp)){s.gender=pp.toUpperCase();continue}
@@ -800,6 +811,15 @@ function dragEv(e,bar,set,el){
   document.addEventListener('mouseup',up);
 }
 function natHint(n){const EN={atk:'Atk',def:'Def',spa:'SpA',spd:'SpD',spe:'Spe'};const m=NMOD[n]||[];if(!m[0])return '(neutral)';return '(+'+(EN[m[0]]||m[0])+'/-'+(EN[m[1]]||m[1])+')';}
+function statsPanelHTML(s){
+  const d=dexIndexCache[s.species];
+  if(!d)return '<div class="field"><label>Estadísticas</label><div class="stats-load">cargando datos…</div></div>';
+  const rows=STATS.map(k=>{
+    const base=d.stats[k]||0;
+    return '<div class="statrow"><span class="sl">'+STAT_ES[k]+'</span><span class="sb">'+base+'</span><span class="sbar"><i style="width:'+Math.min(100,base/255*100)+'%;background:'+statColor(base)+'"></i></span></div>';
+  }).join('');
+  return '<div class="field"><label>Estadísticas base</label><div class="statgrid">'+rows+'</div></div>';
+}
 function slotHTML(s,i){
   if(!s.species)return '<div class="slot empty-slot" data-slot="'+i+'"><div class="empty-add">Slot vacío<div data-combo="species"></div></div></div>';
   const d=dexIndexCache[s.species]||{};
@@ -815,29 +835,31 @@ function slotHTML(s,i){
     return '<div class="sdtrow"><span class="sn">'+STAT_ES[k]+'</span><input class="sdtin" data-ev="'+k+'" value="'+ev+'"><div class="evbar '+(ev>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="sdtin" data-iv="'+k+'" value="'+iv+'"><span class="sdtfin" data-sf="'+k+'">'+fin+'</span></div>';
   }).join('');
   const table='<div class="field"><label>EVs / IVs <span style="color:var(--dim)">· máx 510, 252 c/u</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="sdthead"><span>Stat</span><span>EV</span><span></span><span>IV</span><span>final</span></div><div class="sdt">'+rows+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div>';
-  return '<div class="slot filled" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'')+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="row3"><div class="field"><label>Nivel</label><input type="number" min="1" max="100" data-lvl value="'+(s.level||100)+'"></div><div class="field"><label>Naturaleza</label><select data-nat style="font-size:11px"><option value="">—</option>'+NATURES.map(n=>'<option value="'+n+'" '+(s.nature===n?'selected':'')+' style="font-size:13px">'+n+' '+natHint(n)+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><div data-combo="ability"></div></div></div>'+statsPanelHTML(s)+table+'<div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<div data-combo="move" data-mvi="'+n+'"></div>').join('')+'</div></div></div></div>';}
-function statsPanelHTML(s){
-  const d=dexIndexCache[s.species];
-  if(!d)return '<div class="field"><label>Estadísticas</label><div class="stats-load">cargando datos…</div></div>';
-  const rows=STATS.map(k=>{
-    const base=d.stats[k]||0;
-    return '<div class="statrow"><span class="sl">'+STAT_ES[k]+'</span><span class="sb">'+base+'</span><span class="sbar"><i style="width:'+Math.min(100,base/255*100)+'%;background:'+statColor(base)+'"></i></span></div>';
-  }).join('');
-  return '<div class="field"><label>Estadísticas base</label><div class="statgrid">'+rows+'</div></div>';
+  return '<div class="slot filled" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+(s.nickname?esc(s.nickname)+' <span style="color:var(--dim)">('+esc(s.species)+')</span>':esc(s.species))+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="field"><label>Apodo</label><input type="text" data-nick value="'+esc(s.nickname||'')+'" placeholder="sin apodo" style="max-width:260px"></div><div class="row3"><div class="field"><label>Nivel</label><input type="number" min="1" max="100" data-lvl value="'+(s.level||100)+'"></div><div class="field"><label>Naturaleza</label><select data-nat style="font-size:11px"><option value="">—</option>'+NATURES.map(n=>'<option value="'+n+'" '+(s.nature===n?'selected':'')+' style="font-size:13px">'+n+' '+natHint(n)+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><div data-combo="ability"></div></div></div>'+statsPanelHTML(s)+table+'<div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<div data-combo="move" data-mvi="'+n+'"></div>').join('')+'</div></div></div></div>';
 }
 function renderSlots(){
   const box=document.getElementById('slots');
   if(!box)return;
   while(sets.length<Settings.size)sets.push({});
   sets.length=Settings.size;
+  const _nm=DexCache.pokemon?new Set(DexCache.pokemon.map(p=>p.name)):null;
+  const _isPoke=r=>{const sl=slug(r);return (_nm&&_nm.has(sl))||(dexIndexCache[r]&&dexIndexCache[r].id)||(dexIndexCache[sl]&&dexIndexCache[sl].id);};
   for(let i=0;i<sets.length;i++){
     const s=sets[i];
-    if(s && s.species && (!Array.isArray(s.moves)||!s.evs||!s.ivs)) sets[i]=Object.assign(blank(),s);
+    if(!s||!s.evs||!s.ivs||!Array.isArray(s.moves)) sets[i]=Object.assign(blank(),s||{});
+    const t=sets[i];
+    const mm=/^(.*?)\s*\((.*?)\)\s*$/.exec(t.species||'');
+    if(mm){
+      const a=mm[1].trim(), b=mm[2].trim();
+      if(_isPoke(b)&&!_isPoke(a)){t.nickname=a;t.species=b;}
+      else if(_isPoke(a)&&!_isPoke(b)){t.nickname=b;t.species=a;}
+    }
   }
   const wasOpen=new Set([...box.querySelectorAll('.slot.open')].map(x=>+x.dataset.slot));
   box.innerHTML=sets.map((s,i)=>slotHTML(s,i)).join('');
   wasOpen.forEach(i=>{const o=box.querySelector('[data-slot="'+i+'"]');if(o)o.classList.add('open')});
-  if(openSlotOnRender!=null){const o=box.querySelector('[data-slot="'+openSlotOnRender+'"]');if(o)o.classList.add('open');openSlotOnRender=null;}  box.querySelectorAll('[data-slot]').forEach(el=>{
+  if(openSlotOnRender!=null){const o=box.querySelector('[data-slot="'+openSlotOnRender+'"]');if(o)o.classList.add('open');openSlotOnRender=null;}
+  box.querySelectorAll('[data-slot]').forEach(el=>{
     const i=+el.dataset.slot;
     const s=sets[i];
     const head=el.querySelector('.slot-head');
@@ -853,7 +875,8 @@ function renderSlots(){
     if(fs)fs.onchange=()=>{s.form=fs.value;renderSlots();renderPreview()};
     const ns=el.querySelector('[data-nat]');
     if(ns)ns.onchange=()=>{s.nature=ns.value;renderSlots();renderPreview()};
-    const lv=el.querySelector('[data-lvl]');
+    const nk=el.querySelector('[data-nick]');
+    if(nk)nk.oninput=()=>{s.nickname=nk.value;const sn=el.querySelector('.slot-name');if(sn)sn.innerHTML=esc(s.species)+(s.nickname?' <span style="color:var(--dim)">('+esc(s.nickname)+')</span>':'');renderPreview();};const lv=el.querySelector('[data-lvl]');
     if(lv)lv.onchange=()=>{s.level=clamp(+lv.value||100,1,100);const sid=el.querySelector('.slot-id');if(sid)sid.textContent='#'+((dexIndexCache[s.species]&&dexIndexCache[s.species].id)||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size;STATS.forEach(k=>syncStatFinal(el,s,k));const pre=document.querySelector('.preview .raw-paste');if(pre)pre.textContent=exportTeam(sets.filter(x=>x.species));};
     el.querySelectorAll('[data-ev]').forEach(inp=>{
       const k=inp.dataset.ev;
@@ -895,7 +918,7 @@ function renderSlots(){
     cb.input.value=(sets[i]&&sets[i].item)||'';
     loadItemIndex();
   });
-    box.querySelectorAll('[data-combo=ability]').forEach(el=>{
+  box.querySelectorAll('[data-combo=ability]').forEach(el=>{
     const i=+el.closest('.slot').dataset.slot;
     el.innerHTML='';
     const cb=combo('Buscar habilidad…',()=>{
@@ -913,7 +936,7 @@ function renderSlots(){
     cb.input.value=(sets[i]&&sets[i].ability)||'';
     loadAbilityIndex();
   });
-    box.querySelectorAll('[data-combo=move]').forEach(el=>{
+  box.querySelectorAll('[data-combo=move]').forEach(el=>{
     const i=+el.closest('.slot').dataset.slot;
     const mv=+el.dataset.mvi;
     el.innerHTML='';
@@ -936,6 +959,14 @@ function renderSlots(){
       }
     });
   });
+}
+function pasteRender(real){
+  return '<div class="pp">'+real.map(s=>{
+    const d=dexIndexCache[s.species]||{};
+    const types=d.types||[];
+    const tc=typeColor(types[0]||'normal');
+    return '<div class="pp-set" style="--tc:'+tc+'"><div class="pp-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="pp-lines"><div class="ln-name">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+(s.nickname?' <span class="par">('+esc(s.nickname)+')</span>':s.gender?' <span class="par">('+s.gender+')</span>':'')+(s.item?' <span class="ln-item">@ '+esc(s.item)+'</span>':'')+'</div>'+(s.ability?'<div class="ln-ab">Ability: <b>'+esc(s.ability)+'</b></div>':'')+(s.tera?'<div class="ln-meta">Tera Type: '+esc(s.tera)+'</div>':'')+(s.level&&s.level!==100?'<div class="ln-meta">Level: '+s.level+'</div>':'')+(fmtStats(s.evs)?'<div class="ln-ev">EVs: <b>'+esc(fmtStats(s.evs))+'</b></div>':'')+(fmtStats(s.ivs)?'<div class="ln-iv">IVs: '+esc(fmtStats(s.ivs))+'</div>':'')+(s.nature?'<div class="ln-nat">'+esc(s.nature)+' Nature</div>':'')+(s.moves||[]).filter(Boolean).map(m=>'<div class="ln-mv">'+esc(m)+'<span class="dot" style="background:'+typeColor(guessMoveType(m,types))+'"></span></div>').join('')+'</div></div>';
+  }).join('')+'</div>';
 }
 function renderPreview(){
   const box=document.getElementById('preview');
@@ -969,8 +1000,8 @@ function openImport(){
     back.querySelector('.modal').insertAdjacentHTML('beforeend','<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Cancelar</button><button class="btn btn-primary" data-ok>Importar</button></div>');
     back.querySelector('[data-x]').onclick=()=>back.remove();
     back.querySelector('[data-ok]').onclick=async()=>{
-      const parsed=parseTeam(ta.value);
-      parsed.forEach(s=>{
+      await loadPokemonIndex();
+      const parsed=parseTeam(ta.value);      parsed.forEach(s=>{
         if(s.item)s.item=s.item.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/\s+/g,' ').trim();
       });
       if(!parsed.length){
