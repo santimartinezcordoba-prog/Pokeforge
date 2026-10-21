@@ -165,7 +165,7 @@ input:-webkit-autofill:focus{
 <div class="bg" aria-hidden="true"><canvas id="spritefield"></canvas><div class="bg-grid"></div><div class="bg-glow"></div><div class="bg-scan"></div></div>
 <header class="topbar">
   <a class="wordmark" href="#/inicio"><span class="wm-mark"><svg viewBox="0 0 32 32" width="30" height="30"><circle cx="16" cy="16" r="13.5" fill="#0d1220" stroke="currentColor" stroke-width="2.4"/><path d="M2.6 16h26.8" stroke="currentColor" stroke-width="2.4"/><circle cx="16" cy="16" r="4.6" fill="#0d1220" stroke="currentColor" stroke-width="2.4"/></svg></span><span class="wm-text">CIEGA<b>·</b>PASTE</span><span class="wm-sub">intercambio a ciegas</span></a>
-  <nav class="mainnav"><a href="#/inicio" data-nav="inicio">Inicio</a><a href="#/constructor" data-nav="constructor">Constructor</a><a href="#/equipos" data-nav="equipos">Mis equipos</a><a href="#/unirse" data-nav="unirse">Unirse</a><a href="#/dex" data-nav="dex">Pokédex</a><a href="#/ajustes" data-nav="ajustes" class="nav-ico">⚙</a></nav>  <form class="quickjoin" id="quickjoin" autocomplete="off"><input id="quickjoin-input" maxlength="16" placeholder="código de sala"><button type="submit">Unirse</button></form>
+  <nav class="mainnav"><a href="#/inicio" data-nav="inicio">Inicio</a><a href="#/constructor" data-nav="constructor">Enfrentamientos</a><a href="#/equipos" data-nav="equipos">Mis equipos</a><a href="#/unirse" data-nav="unirse">Unirse</a><a href="#/dex" data-nav="dex">Pokédex</a><a href="#/ajustes" data-nav="ajustes" class="nav-ico">⚙</a></nav>  <form class="quickjoin" id="quickjoin" autocomplete="off"><input id="quickjoin-input" maxlength="16" placeholder="código de sala"><button type="submit">Unirse</button></form>
 </header>
 <main id="app" class="app"></main>
 <footer class="footer"><div class="f-left"><b>CIEGA·PASTE</b> · proyecto independiente, sin afiliación con Nintendo / Game Freak / The Pokémon Company.</div><div class="f-right">Sprites: Pokémon Showdown · Datos: PokeAPI · Formato: compatible con pokepaste.es</div></footer>
@@ -1236,7 +1236,7 @@ async function viewMyTeams(){
   app.appendChild(h('<h2 class="section-title">Mis equipos · <span style="color:var(--gold)">'+esc(Settings.name)+'</span></h2>'));
   const list=loadMyTeams();
   if(!list.length){
-    app.appendChild(h('<div class="card"><h3>Aún no tienes equipos guardados</h3><p style="color:var(--muted)">Crea un equipo en el Constructor y pulsa 💾 Guardar. Se queda aquí aunque cierres el navegador.</p><a class="btn btn-primary" href="#/constructor">Ir al Constructor</a></div>'));
+    app.appendChild(h('<div class="card"><h3>Aún no tienes equipos guardados</h3><p style="color:var(--muted)">Crea un equipo en Enfrentramientos y pulsa 💾 Guardar. Se queda aquí aunque cierres el navegador.</p><a class="btn btn-primary" href="#/constructor">Ir al Enfrentamientos</a></div>'));
     return;
   }
   const box=h('<div class="roomlist"></div>');
@@ -1609,6 +1609,7 @@ function cpInitAccount() {
     document.head.appendChild(st);
   }
   cpRenderChip();
+// cpMaybeOpenOnLoad();
   cpMaybeOpenOnLoad();
 
   window.addEventListener("hashchange", () => {
@@ -1638,6 +1639,112 @@ if (typeof window.saveCurrentTeam === "function") {
 
 window.teamsKey = cpTeamsKey;
 // ---- CPASTE ACCOUNTS FRONT END ----
+// ---- CPASTE TEAMS VIEW START ----
+function cpReadTeams(){
+  let a=[];
+  try{ a=JSON.parse(localStorage.getItem(cpTeamsKey())||'[]'); }catch(e){ a=[]; }
+  if(!Array.isArray(a)) a=[];
+  if(!a.length){ // fallback a la key vieja por nombre
+    const old=localStorage.getItem('cpaste.teams.'+(typeof myName==='function'?myName():''));
+    if(old){ try{ a=JSON.parse(old); }catch(e){ a=[]; } if(a.length) localStorage.setItem(cpTeamsKey(), JSON.stringify(a)); }
+  }
+  return a;
+}
+function cpWriteTeams(a){
+  localStorage.setItem(cpTeamsKey(), JSON.stringify(a));
+  if(cpAccount && cpAccount.token){ cpPushTeams(false).catch(()=>{}); }
+}
+function cpFindTeam(id){ return cpReadTeams().find(t=>String(t.id)===String(id)); }
+
+function cpExportTeam(id){
+  const t=cpFindTeam(id); if(!t){alert('No encontrado');return;}
+  const done=()=>alert('Equipo copiado. Ve a Enfrentamientos y pégalo con Importar.');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t.team).then(done).catch(()=>cpCopyFallback(t.team,done));
+  } else cpCopyFallback(t.team,done);
+}
+function cpCopyFallback(text,done){
+  const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){ alert('Copia manual: '+e.message); }
+  document.body.removeChild(ta);
+}
+function cpDeleteTeam(id){
+  if(!confirm('¿Borrar este equipo?')) return;
+  cpWriteTeams(cpReadTeams().filter(t=>String(t.id)!==String(id)));
+  cpRenderTeams();
+}
+function cpNewTeam(){ location.hash='#/constructor'; } // mismo editor de 6, al guardar va a Mis equipos
+
+function cpImportOpen(){
+  let host=document.getElementById('cpModalHost');
+  if(!host){ host=document.createElement('div'); host.id='cpModalHost'; document.body.appendChild(host); }
+  host.innerHTML=`
+    <div class="cp-modal-bg" onclick="if(event.target===this)cpImportClose()">
+      <div class="cp-modal-box">
+        <button class="cp-modal-x" onclick="cpImportClose()">✕</button>
+        <h3 style="margin-top:0;">Importar equipo a Mis equipos</h3>
+        <p class="cp-modal-note">Pega aquí un equipo en formato Showdown (uno por línea, EVs, movimientos, etc.).</p>
+        <textarea id="cpImp" style="width:100%;height:200px;box-sizing:border-box;background:#0d121c;color:#e8eefc;border:1px solid #3a4a66;border-radius:6px;padding:8px;font-family:monospace;" placeholder="Bulbasaur @ Leftovers&#10;Quiet Nature&#10;EVs: ..."></textarea>
+        <div class="cp-modal-row">
+          <button class="cp-modal-primary" onclick="cpImportSave()">Guardar en Mis equipos</button>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(()=>{const t=document.getElementById('cpImp');if(t)t.focus();},30);
+}
+function cpImportClose(){ const h=document.getElementById('cpModalHost'); if(h)h.innerHTML=''; }
+function cpImportSave(){
+  const ta=document.getElementById('cpImp'); const txt=(ta&&ta.value||'').trim();
+  if(!txt){ alert('Pega un equipo'); return; }
+  if(typeof parseTeam==='function'){
+    let n=0; try{ const s=parseTeam(txt); n=(s&&s.length)||0; }catch(e){}
+    if(!n){ alert('No he reconocido ningún Pokémon. Revisa el formato.'); return; }
+  }
+  const a=cpReadTeams();
+  const name=prompt('Nombre para este equipo','Equipo '+(a.length+1))||('Equipo '+(a.length+1));
+  a.push({id:'t'+Date.now(), name, team:txt, created:Date.now()});
+  cpWriteTeams(a);
+  cpImportClose(); cpRenderTeams();
+}
+
+function cpRenderTeams(){
+  const app=document.getElementById('app')||document.querySelector('main,.view');
+  const who=(typeof myName==='function'?myName():'')|| (cpAccount?cpAccount.name:'');
+  const teams=cpReadTeams();
+  let cards='';
+  if(!teams.length){
+    cards=`<div style="border:1px solid #3a4a66;border-radius:12px;padding:18px;background:#141a26;color:#e8eefc;">
+      <h3 style="margin-top:0;">Aún no tienes equipos guardados</h3>
+      <p style="opacity:.8;">Crea uno en Enfrentamientos y pulsa 💾 Guardar, o pega uno con Importar de texto.</p>
+      <button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">Ir a Enfrentamientos</button>
+    </div>`;
+  } else {
+    cards=teams.map(t=>`
+      <div style="border:1px solid #3a4a66;border-radius:12px;padding:14px;margin:10px 0;background:#141a26;color:#e8eefc;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <b style="color:#ffd24a;">${cpEsc(t.name)}</b>
+          <span style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="cpExportTeam('${t.id}')" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">📋 Exportar</button>
+            <button onclick="cpNewTeam()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">✏️ Editar</button>
+            <button onclick="cpDeleteTeam('${t.id}')" style="background:#5a2430;border:1px solid #8a3a4a;color:#ffd6d6;padding:6px 10px;border-radius:6px;cursor:pointer;">🗑️</button>
+          </span>
+        </div>
+        <pre style="white-space:pre-wrap;word-break:break-word;margin:10px 0 0;font-family:monospace;font-size:12px;opacity:.85;max-height:140px;overflow:auto;">${cpEsc(t.team)}</pre>
+      </div>`).join('');
+  }
+  const bar=`
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;">
+      <button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">➕ Crear equipo</button>
+      <button onclick="cpImportOpen()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">📥 Importar de texto</button>
+    </div>`;
+  const html=`<h2 style="color:#ffd24a;">Mis equipos${who?' · '+cpEsc(who):''}</h2>${bar}${cards}`;
+  if(app) app.innerHTML=html;
+  return html;
+}
+// anulo la vista de equipos antigua con la mía
+window.viewMyTeams = cpRenderTeams;
+// ---- CPASTE TEAMS VIEW END ----
 </script>
 </body>
 </html>
