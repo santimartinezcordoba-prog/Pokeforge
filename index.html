@@ -1405,6 +1405,305 @@ function startBg(){
     requestAnimationFrame(loop);
   })();
 }
+// ---- CPASTE ACCOUNTS FRONT START ----
+const CP_DEFAULT_RELAY = "https://ciega-relay.santimartinezcordoba.workers.dev";
+
+let cpAccount = null;
+try {
+  cpAccount = JSON.parse(localStorage.getItem("cpaste.account") || "null");
+} catch (e) {
+  cpAccount = null;
+}
+
+function cpBase() {
+  return (
+    localStorage.getItem("cpaste.relay") ||
+    CP_DEFAULT_RELAY
+  ).replace(/\/+$/, "");
+}
+
+function cpEsc(s) {
+  return String(s || "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[c]));
+}
+
+async function cpApi(path, body = {}, method = "POST") {
+  const headers = {};
+
+  if (cpAccount && cpAccount.token) {
+    headers["x-cpaste-token"] = cpAccount.token;
+  }
+
+  let url = cpBase() + path;
+  const opts = { method, headers };
+
+  if (method === "GET") {
+    const qs = new URLSearchParams(body || {}).toString();
+    if (qs) url += "?" + qs;
+  } else {
+    headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body || {});
+  }
+
+  const res = await fetch(url, opts);
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    data = { ok: false, error: "Respuesta no JSON (" + res.status + ")" };
+  }
+
+  if (res.status === 401 && cpAccount) {
+    cpLogout(false);
+  }
+
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || ("HTTP " + res.status));
+  }
+
+  return data;
+}
+
+function cpTeamsKey() {
+  const accName = cpAccount && cpAccount.name ? cpAccount.name : "";
+  const displayName = typeof myName === "function" ? myName() : "";
+  return "cpaste.teams." + (accName || displayName || "Anon");
+}
+
+function cpSetAccount(a) {
+  cpAccount = a || null;
+
+  if (cpAccount) {
+    localStorage.setItem("cpaste.account", JSON.stringify(cpAccount));
+  } else {
+    localStorage.removeItem("cpaste.account");
+  }
+}
+
+async function cpPullTeams(showAlert = false) {
+  if (!cpAccount || !cpAccount.token) return null;
+
+  const d = await cpApi("/api/teams.get", {}, "GET");
+  localStorage.setItem(cpTeamsKey(), JSON.stringify(d.teams || []));
+
+  if (showAlert) {
+    alert("Equipos descargados: " + (d.teams || []).length);
+  }
+
+  return d.teams || [];
+}
+
+async function cpPushTeams(showAlert = true) {
+  if (!cpAccount || !cpAccount.token) {
+    alert("Primero inicia sesión.");
+    return;
+  }
+
+  const teams =
+    typeof loadMyTeams === "function"
+      ? loadMyTeams()
+      : JSON.parse(localStorage.getItem(cpTeamsKey()) || "[]");
+
+  const d = await cpApi("/api/teams.save", { teams: teams || [] });
+  localStorage.setItem(cpTeamsKey(), JSON.stringify(d.teams || []));
+
+  if (showAlert) {
+    alert("Equipos subidos: " + (d.teams || []).length);
+  }
+
+  return d.teams || [];
+}
+
+async function cpImportLocalTeams() {
+  if (!cpAccount || !cpAccount.token) {
+    alert("Primero inicia sesión.");
+    return;
+  }
+
+  const oldKey =
+    "cpaste.teams." + (typeof myName === "function" ? myName() : "");
+
+  const old = JSON.parse(localStorage.getItem(oldKey) || "[]");
+
+  if (!old.length) {
+    alert("No hay equipos locales para importar.");
+    return;
+  }
+
+  const d = await cpApi("/api/teams.save", { teams: old });
+  localStorage.setItem(cpTeamsKey(), JSON.stringify(d.teams || []));
+  alert("Importados: " + (d.teams || []).length);
+}
+
+async function cpRegister() {
+  const name = (document.getElementById("cpName")?.value || "").trim();
+  const pass = document.getElementById("cpPass")?.value || "";
+
+  if (!name || !pass) {
+    alert("Usuario y contraseña obligatorios");
+    return;
+  }
+
+  try {
+    const d = await cpApi("/api/register", { name, pass });
+    cpSetAccount({ token: d.token, name: d.name });
+    await cpPullTeams(false);
+    cpMountAccount();
+    alert("Cuenta creada: " + d.name);
+  } catch (e) {
+    alert("No se pudo crear: " + e.message);
+  }
+}
+
+async function cpLogin() {
+  const name = (document.getElementById("cpName")?.value || "").trim();
+  const pass = document.getElementById("cpPass")?.value || "";
+
+  if (!name || !pass) {
+    alert("Usuario y contraseña obligatorios");
+    return;
+  }
+
+  try {
+    const d = await cpApi("/api/login", { name, pass });
+    cpSetAccount({ token: d.token, name: d.name });
+    await cpPullTeams(false);
+    cpMountAccount();
+    alert("Conectado como " + d.name);
+  } catch (e) {
+    alert("No se pudo entrar: " + e.message);
+  }
+}
+
+function cpLogout(callApi = true) {
+  if (cpAccount && cpAccount.token && callApi) {
+    cpApi("/api/logout", { token: cpAccount.token }).catch(() => {});
+  }
+
+  cpSetAccount(null);
+  cpMountAccount();
+}
+
+function cpAccountPanelHTML() {
+  if (cpAccount) {
+    return `
+      <div style="margin:12px;padding:12px;border:1px solid #777;border-radius:8px;">
+        <h3 style="margin-top:0;">Cuenta</h3>
+        <p>Conectado como <b>${cpEsc(cpAccount.name)}</b></p>
+        <button onclick="cpPullTeams(true)">Descargar equipos</button>
+        <button onclick="cpPushTeams(true)">Subir equipos</button>
+        <button onclick="cpImportLocalTeams()">Importar locales</button>
+        <button onclick="cpLogout(true)">Cerrar sesión</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="margin:12px;padding:12px;border:1px solid #777;border-radius:8px;">
+      <h3 style="margin-top:0;">Cuenta</h3>
+      <input id="cpName" placeholder="Usuario" maxlength="32" style="margin-right:6px;padding:6px;">
+      <input id="cpPass" type="password" placeholder="Contraseña" maxlength="64" style="margin-right:6px;padding:6px;">
+      <button onclick="cpRegister()">Crear cuenta</button>
+      <button onclick="cpLogin()">Entrar</button>
+      <p style="margin-bottom:0;font-size:12px;opacity:.75;">
+        Mismo usuario + misma contraseña en dos dispositivos = mismos equipos en la nube.
+      </p>
+    </div>
+  `;
+}
+
+function cpMountAccount() {
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  const h = location.hash.toLowerCase();
+  const show =
+    h.startsWith("#/ajustes") ||
+    h.startsWith("#/settings") ||
+    h.startsWith("#/config") ||
+    h.startsWith("#/cuenta") ||
+    h.startsWith("#/equipos");
+
+  let panel = document.getElementById("cpAccountPanel");
+
+  if (!show) {
+    if (panel) panel.remove();
+    return;
+  }
+
+  if (panel) {
+    panel.innerHTML = cpAccountPanelHTML();
+    return;
+  }
+
+  panel = document.createElement("div");
+  panel.id = "cpAccountPanel";
+  panel.innerHTML = cpAccountPanelHTML();
+  app.appendChild(panel);
+}
+
+function cpInitAccount() {
+  cpMountAccount();
+
+  window.addEventListener("hashchange", async () => {
+    cpMountAccount();
+
+    if (cpAccount && cpAccount.token && location.hash.startsWith("#/equipos")) {
+      try {
+        await cpPullTeams(false);
+      } catch (e) {
+        console.warn("cpull", e);
+      }
+    }
+  });
+
+  if (cpAccount && cpAccount.token) {
+    cpPullTeams(false).catch(e => {
+      console.warn("cpull init", e);
+    });
+  }
+
+  const app = document.getElementById("app");
+  if (app) {
+    new MutationObserver(() => cpMountAccount()).observe(app, { childList: true });
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", cpInitAccount);
+} else {
+  cpInitAccount();
+}
+
+// Si ya tienes saveCurrentTeam, lo envolvemos para que también suba a la nube.
+if (typeof window.saveCurrentTeam === "function") {
+  const _cpOldSaveCurrentTeam = window.saveCurrentTeam;
+
+  window.saveCurrentTeam = async function () {
+    const res = await _cpOldSaveCurrentTeam.apply(this, arguments);
+
+    if (cpAccount && cpAccount.token) {
+      try {
+        await cpPushTeams(false);
+      } catch (e) {
+        console.warn("cpush", e);
+        alert("Guardado local, pero fallo al subir a la nube: " + e.message);
+      }
+    }
+
+    return res;
+  };
+}
+
+// Si ya tienes teamsKey, lo redirigimos al key de cuenta.
+window.teamsKey = cpTeamsKey;
+// ---- CPASTE ACCOUNTS FRONT END ----
 </script>
 </body>
 </html>
