@@ -704,13 +704,16 @@ let room=null;
 let pollTimer=null;
 let lastRenderedStatus=null;
 let openSlotOnRender=null;
-const routes={inicio:viewHome,constructor:viewBuilder,equipos:viewMyTeams,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};  const hash=(location.hash||'#/inicio').replace('#/','');
+const routes={inicio:viewHome,constructor:viewBuilder,equipos:viewMyTeams,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};
+function nav(){
+  const hash=(location.hash||'#/inicio').replace('#/','');
   const[name,...rest]=hash.split('/');
   document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
   document.getElementById('app').innerHTML='';
   const fn=routes[name]||viewHome;
   fn(rest);
   window.scrollTo(0,0);
+}
 window.addEventListener('hashchange',()=>{stopPoll();nav()});
 Store.on(()=>{if(room)refreshRoom()});
 window.addEventListener('DOMContentLoaded',()=>{
@@ -1640,109 +1643,72 @@ if (typeof window.saveCurrentTeam === "function") {
 window.teamsKey = cpTeamsKey;
 // ---- CPASTE ACCOUNTS FRONT END ----
 // ---- CPASTE TEAMS VIEW START ----
+let cpEditTeamId = null;
+
 function cpReadTeams(){
-  let a=[];
-  try{ a=JSON.parse(localStorage.getItem(cpTeamsKey())||'[]'); }catch(e){ a=[]; }
+  let a=[]; try{ a=JSON.parse(localStorage.getItem(cpTeamsKey())||'[]'); }catch(e){ a=[]; }
   if(!Array.isArray(a)) a=[];
-  if(!a.length){ // fallback a la key vieja por nombre
-    const old=localStorage.getItem('cpaste.teams.'+(typeof myName==='function'?myName():''));
-    if(old){ try{ a=JSON.parse(old); }catch(e){ a=[]; } if(a.length) localStorage.setItem(cpTeamsKey(), JSON.stringify(a)); }
-  }
+  if(!a.length){ const old=localStorage.getItem('cpaste.teams.'+(typeof myName==='function'?myName():'')); if(old){ try{ a=JSON.parse(old); }catch(e){} if(a.length) localStorage.setItem(cpTeamsKey(), JSON.stringify(a)); } }
   return a;
 }
-function cpWriteTeams(a){
-  localStorage.setItem(cpTeamsKey(), JSON.stringify(a));
-  if(cpAccount && cpAccount.token){ cpPushTeams(false).catch(()=>{}); }
-}
+function cpWriteTeams(a){ localStorage.setItem(cpTeamsKey(), JSON.stringify(a)); if(cpAccount&&cpAccount.token) cpPushTeams(false).catch(()=>{}); }
 function cpFindTeam(id){ return cpReadTeams().find(t=>String(t.id)===String(id)); }
+function cpExportTeam(id){ const t=cpFindTeam(id); if(!t){alert('No encontrado');return;} const d=()=>alert('Equipo copiado. Pégalo donde quieras.'); if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t.team).then(d).catch(()=>cpCopyFallback(t.team,d)); else cpCopyFallback(t.team,d); }
+function cpCopyFallback(text,d){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); d(); }catch(e){} document.body.removeChild(ta); }
+function cpDeleteTeam(id){ if(!confirm('¿Borrar este equipo?'))return; cpWriteTeams(cpReadTeams().filter(t=>String(t.id)!==String(id))); cpRenderTeams(); }
+function cpNewTeam(){ location.hash='#/editar/new'; }
 
-function cpExportTeam(id){
-  const t=cpFindTeam(id); if(!t){alert('No encontrado');return;}
-  const done=()=>alert('Equipo copiado. Ve a Enfrentamientos y pégalo con Importar.');
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(t.team).then(done).catch(()=>cpCopyFallback(t.team,done));
-  } else cpCopyFallback(t.team,done);
-}
-function cpCopyFallback(text,done){
-  const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
-  document.body.appendChild(ta); ta.select();
-  try{ document.execCommand('copy'); done(); }catch(e){ alert('Copia manual: '+e.message); }
-  document.body.removeChild(ta);
-}
-function cpDeleteTeam(id){
-  if(!confirm('¿Borrar este equipo?')) return;
-  cpWriteTeams(cpReadTeams().filter(t=>String(t.id)!==String(id)));
-  cpRenderTeams();
-}
-function cpNewTeam(){ location.hash='#/constructor'; } // mismo editor de 6, al guardar va a Mis equipos
-
-function cpImportOpen(){
-  let host=document.getElementById('cpModalHost');
-  if(!host){ host=document.createElement('div'); host.id='cpModalHost'; document.body.appendChild(host); }
-  host.innerHTML=`
-    <div class="cp-modal-bg" onclick="if(event.target===this)cpImportClose()">
-      <div class="cp-modal-box">
-        <button class="cp-modal-x" onclick="cpImportClose()">✕</button>
-        <h3 style="margin-top:0;">Importar equipo a Mis equipos</h3>
-        <p class="cp-modal-note">Pega aquí un equipo en formato Showdown (uno por línea, EVs, movimientos, etc.).</p>
-        <textarea id="cpImp" style="width:100%;height:200px;box-sizing:border-box;background:#0d121c;color:#e8eefc;border:1px solid #3a4a66;border-radius:6px;padding:8px;font-family:monospace;" placeholder="Bulbasaur @ Leftovers&#10;Quiet Nature&#10;EVs: ..."></textarea>
-        <div class="cp-modal-row">
-          <button class="cp-modal-primary" onclick="cpImportSave()">Guardar en Mis equipos</button>
-        </div>
-      </div>
-    </div>`;
-  setTimeout(()=>{const t=document.getElementById('cpImp');if(t)t.focus();},30);
-}
+function cpImportOpen(){ let host=document.getElementById('cpModalHost'); if(!host){host=document.createElement('div');host.id='cpModalHost';document.body.appendChild(host);} host.innerHTML=`<div class="cp-modal-bg" onclick="if(event.target===this)cpImportClose()"><div class="cp-modal-box"><button class="cp-modal-x" onclick="cpImportClose()">✕</button><h3 style="margin-top:0;">Importar equipo a Mis equipos</h3><textarea id="cpImp" style="width:100%;height:200px;box-sizing:border-box;background:#0d121c;color:#e8eefc;border:1px solid #3a4a66;border-radius:6px;padding:8px;font-family:monospace;" placeholder="Bulbasaur @ Leftovers&#10;Quiet Nature"></textarea><div class="cp-modal-row"><button class="cp-modal-primary" onclick="cpImportSave()">Guardar en Mis equipos</button></div></div></div>`; setTimeout(()=>{const t=document.getElementById('cpImp');if(t)t.focus();},30); }
 function cpImportClose(){ const h=document.getElementById('cpModalHost'); if(h)h.innerHTML=''; }
-function cpImportSave(){
-  const ta=document.getElementById('cpImp'); const txt=(ta&&ta.value||'').trim();
-  if(!txt){ alert('Pega un equipo'); return; }
-  if(typeof parseTeam==='function'){
-    let n=0; try{ const s=parseTeam(txt); n=(s&&s.length)||0; }catch(e){}
-    if(!n){ alert('No he reconocido ningún Pokémon. Revisa el formato.'); return; }
-  }
-  const a=cpReadTeams();
-  const name=prompt('Nombre para este equipo','Equipo '+(a.length+1))||('Equipo '+(a.length+1));
-  a.push({id:'t'+Date.now(), name, team:txt, created:Date.now()});
-  cpWriteTeams(a);
-  cpImportClose(); cpRenderTeams();
+function cpImportSave(){ const ta=document.getElementById('cpImp'); const txt=(ta&&ta.value||'').trim(); if(!txt){alert('Pega un equipo');return;} if(typeof parseTeam==='function'){ let n=0; try{ n=(parseTeam(txt)||[]).length; }catch(e){} if(!n){alert('No he reconocido ningún Pokémon.');return;} } const a=cpReadTeams(); const name=prompt('Nombre para este equipo','Equipo '+(a.length+1))||('Equipo '+(a.length+1)); a.push({id:'t'+Date.now(),name,team:txt,created:Date.now()}); cpWriteTeams(a); cpImportClose(); cpRenderTeams(); }
+
+/* ---- MODO EDICIÓN (reutiliza el constructor, sin sala) ---- */
+function cpPatchBuilderBar(){
+  const app=document.getElementById('app'); if(!app) return;
+  app.querySelectorAll('button').forEach(b=>{ const t=(b.textContent||'').toLowerCase(); if(t.includes('sala')||t.includes('enviar')||t.includes('envia')||t.includes('unirse')) b.style.display='none'; });
+  app.querySelectorAll('input').forEach(i=>{ const p=(i.placeholder||'').toLowerCase(); if(p.includes('código')||p.includes('codigo')||p.includes('sala')) i.style.display='none'; });
+  let bar=document.getElementById('cpEditBar');
+  if(!bar){ bar=document.createElement('div'); bar.id='cpEditBar'; bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;'; app.insertBefore(bar, app.firstChild); }
+  bar.innerHTML=`<button onclick="cpBackToTeams()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">← Volver a Mis equipos</button><button onclick="cpSaveFromBuilder()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">💾 Guardar en Mis equipos</button>`;
 }
+function cpEditView(id){
+  if(typeof viewBuilder!=='function'){ document.getElementById('app').innerHTML='<p>No encuentro el constructor.</p>'; return; }
+  sets = (id && id!=='new' && cpFindTeam(id)) ? (parseTeam(cpFindTeam(id).team)||[]) : [];
+  cpEditTeamId = id || 'new';
+  viewBuilder();
+  cpPatchBuilderBar(); setTimeout(cpPatchBuilderBar,250);
+}
+async function cpSaveFromBuilder(){
+  try{ await saveCurrentTeam(); }catch(e){ alert('No se pudo guardar: '+e.message); return; }
+  cpEditTeamId=null; location.hash='#/equipos';
+}
+function cpBackToTeams(){ cpEditTeamId=null; location.hash='#/equipos'; }
+
+/* envuelve viewBuilder para ocultar la barra de sala SOLO en modo edición */
+if(typeof window.viewBuilder==='function'){
+  const _cpOldBuilder = window.viewBuilder;
+  window.viewBuilder = function(){
+    const inEdit = cpEditTeamId && location.hash.indexOf('#/editar')===0;
+    if(!inEdit) cpEditTeamId=null;
+    _cpOldBuilder.apply(this, arguments);
+    if(inEdit){ cpPatchBuilderBar(); setTimeout(cpPatchBuilderBar,250); }
+  };
+}
+if(typeof routes==='object'){ routes.editar = (rest)=>cpEditView(rest&&rest[0]); }
 
 function cpRenderTeams(){
-  const app=document.getElementById('app')||document.querySelector('main,.view');
-  const who=(typeof myName==='function'?myName():'')|| (cpAccount?cpAccount.name:'');
+  const app=document.getElementById('app'); if(!app) return;
+  const who=(typeof myName==='function'?myName():'')||(cpAccount?cpAccount.name:'');
   const teams=cpReadTeams();
+  const bar=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;">
+    <button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">➕ Crear equipo</button>
+    <button onclick="cpImportOpen()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">📥 Importar de texto</button></div>`;
   let cards='';
-  if(!teams.length){
-    cards=`<div style="border:1px solid #3a4a66;border-radius:12px;padding:18px;background:#141a26;color:#e8eefc;">
-      <h3 style="margin-top:0;">Aún no tienes equipos guardados</h3>
-      <p style="opacity:.8;">Crea uno en Enfrentamientos y pulsa 💾 Guardar, o pega uno con Importar de texto.</p>
-      <button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">Ir a Enfrentamientos</button>
-    </div>`;
-  } else {
-    cards=teams.map(t=>`
-      <div style="border:1px solid #3a4a66;border-radius:12px;padding:14px;margin:10px 0;background:#141a26;color:#e8eefc;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-          <b style="color:#ffd24a;">${cpEsc(t.name)}</b>
-          <span style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick="cpExportTeam('${t.id}')" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">📋 Exportar</button>
-            <button onclick="cpNewTeam()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">✏️ Editar</button>
-            <button onclick="cpDeleteTeam('${t.id}')" style="background:#5a2430;border:1px solid #8a3a4a;color:#ffd6d6;padding:6px 10px;border-radius:6px;cursor:pointer;">🗑️</button>
-          </span>
-        </div>
-        <pre style="white-space:pre-wrap;word-break:break-word;margin:10px 0 0;font-family:monospace;font-size:12px;opacity:.85;max-height:140px;overflow:auto;">${cpEsc(t.team)}</pre>
-      </div>`).join('');
-  }
-  const bar=`
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;">
-      <button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">➕ Crear equipo</button>
-      <button onclick="cpImportOpen()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">📥 Importar de texto</button>
-    </div>`;
-  const html=`<h2 style="color:#ffd24a;">Mis equipos${who?' · '+cpEsc(who):''}</h2>${bar}${cards}`;
-  if(app) app.innerHTML=html;
-  return html;
+  if(!teams.length){ cards=`<div style="border:1px solid #3a4a66;border-radius:12px;padding:18px;background:#141a26;color:#e8eefc;"><h3 style="margin-top:0;">Aún no tienes equipos</h3><p style="opacity:.8;">Pulsa Crear equipo (abre el editor de 6, sin sala) o Importar de texto.</p></div>`; }
+  else cards=teams.map(t=>`<div style="border:1px solid #3a4a66;border-radius:12px;padding:14px;margin:10px 0;background:#141a26;color:#e8eefc;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><b style="color:#ffd24a;">${cpEsc(t.name)}</b><span style="display:flex;gap:8px;flex-wrap:wrap;"><button onclick="cpExportTeam('${t.id}')" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">📋 Exportar</button><button onclick="cpDeleteTeam('${t.id}')" style="background:#5a2430;border:1px solid #8a3a4a;color:#ffd6d6;padding:6px 10px;border-radius:6px;cursor:pointer;">🗑️</button></span></div><pre style="white-space:pre-wrap;word-break:break-word;margin:10px 0 0;font-family:monospace;font-size:12px;opacity:.85;max-height:140px;overflow:auto;">${cpEsc(t.team)}</pre></div>`).join('');
+  app.innerHTML=`<h2 style="color:#ffd24a;">Mis equipos${who?' · '+cpEsc(who):''}</h2>${bar}${cards}`;
 }
-// anulo la vista de equipos antigua con la mía
+try{ routes.equipos = cpRenderTeams; }catch(e){}
 window.viewMyTeams = cpRenderTeams;
 // ---- CPASTE TEAMS VIEW END ----
 </script>
