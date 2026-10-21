@@ -165,7 +165,7 @@ input:-webkit-autofill:focus{
 <div class="bg" aria-hidden="true"><canvas id="spritefield"></canvas><div class="bg-grid"></div><div class="bg-glow"></div><div class="bg-scan"></div></div>
 <header class="topbar">
   <a class="wordmark" href="#/inicio"><span class="wm-mark"><svg viewBox="0 0 32 32" width="30" height="30"><circle cx="16" cy="16" r="13.5" fill="#0d1220" stroke="currentColor" stroke-width="2.4"/><path d="M2.6 16h26.8" stroke="currentColor" stroke-width="2.4"/><circle cx="16" cy="16" r="4.6" fill="#0d1220" stroke="currentColor" stroke-width="2.4"/></svg></span><span class="wm-text">CIEGA<b>·</b>PASTE</span><span class="wm-sub">intercambio a ciegas</span></a>
-  <nav class="mainnav"><a href="#/inicio" data-nav="inicio">Inicio</a><a href="#/constructor" data-nav="constructor">Constructor</a><a href="#/unirse" data-nav="unirse">Unirse</a><a href="#/dex" data-nav="dex">Pokédex</a><a href="#/ajustes" data-nav="ajustes" class="nav-ico">⚙</a></nav>  <form class="quickjoin" id="quickjoin" autocomplete="off"><input id="quickjoin-input" maxlength="16" placeholder="código de sala"><button type="submit">Unirse</button></form>
+  <nav class="mainnav"><a href="#/inicio" data-nav="inicio">Inicio</a><a href="#/constructor" data-nav="constructor">Constructor</a><a href="#/equipos" data-nav="equipos">Mis equipos</a><a href="#/unirse" data-nav="unirse">Unirse</a><a href="#/dex" data-nav="dex">Pokédex</a><a href="#/ajustes" data-nav="ajustes" class="nav-ico">⚙</a></nav>  <form class="quickjoin" id="quickjoin" autocomplete="off"><input id="quickjoin-input" maxlength="16" placeholder="código de sala"><button type="submit">Unirse</button></form>
 </header>
 <main id="app" class="app"></main>
 <footer class="footer"><div class="f-left"><b>CIEGA·PASTE</b> · proyecto independiente, sin afiliación con Nintendo / Game Freak / The Pokémon Company.</div><div class="f-right">Sprites: Pokémon Showdown · Datos: PokeAPI · Formato: compatible con pokepaste.es</div></footer>
@@ -561,6 +561,25 @@ function modal(title,body,onOpen){
   onOpen&&onOpen(back);
   return back;
 }
+function ensureNameGate(){
+  if(Settings.name)return;
+  const back=document.createElement('div');
+  back.className='modal-back';
+  back.innerHTML='<div class="modal" style="max-width:440px"><h3>Regístrate para entrar</h3><p style="color:var(--muted);margin:6px 0 14px">Elige tu nombre de entrenador. Es el que verá tu rival en la sala y en el intercambio.</p><div class="field"><label>Nombre de entrenador</label><input id="gate-name" maxlength="16" placeholder="p. ej. Ash" style="font-family:var(--mono);letter-spacing:.05em"></div><button class="btn btn-primary btn-lg" id="gate-go" style="width:100%">Entrar con este nombre</button></div>';
+  document.getElementById('modal-root').appendChild(back);
+  const inp=back.querySelector('#gate-name'),go=back.querySelector('#gate-go');
+  const submit=()=>{
+    const v=inp.value.trim().replace(/\s+/g,' ').slice(0,16);
+    if(!v){inp.focus();inp.style.borderColor='var(--bad)';return;}
+    Settings.name=v;saveSettings();back.remove();
+    toast('Bienvenido, '+v,'ok');
+        if(!loadMyTeams().length&&!localStorage.getItem('cpaste.teams.'+v)){/* primer equipo: vacío */}
+    if(room)refreshRoom();
+  };
+  go.onclick=submit;
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
+  setTimeout(()=>inp.focus(),50);
+}
 function typeChip(t){return '<span class="chip" style="background:'+typeColor(t)+'">'+esc(typeES(t))+'</span>'}
 function miniType(t){return '<span class="mini-type" style="background:'+typeColor(t)+'">'+esc(t)+'</span>'}
 
@@ -685,20 +704,19 @@ let room=null;
 let pollTimer=null;
 let lastRenderedStatus=null;
 let openSlotOnRender=null;
-  const routes={inicio:viewHome,constructor:viewBuilder,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};function nav(){
-  const hash=(location.hash||'#/inicio').replace('#/','');
+const routes={inicio:viewHome,constructor:viewBuilder,equipos:viewMyTeams,unirse:viewJoin,dex:viewDex,ajustes:viewSettings,sala:renderRoomView};  const hash=(location.hash||'#/inicio').replace('#/','');
   const[name,...rest]=hash.split('/');
   document.querySelectorAll('.mainnav a').forEach(a=>a.classList.toggle('on',a.dataset.nav===name));
   document.getElementById('app').innerHTML='';
   const fn=routes[name]||viewHome;
   fn(rest);
   window.scrollTo(0,0);
-}
 window.addEventListener('hashchange',()=>{stopPoll();nav()});
 Store.on(()=>{if(room)refreshRoom()});
 window.addEventListener('DOMContentLoaded',()=>{
   nav();
   startBg();
+    ensureNameGate();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&room)refreshRoom();});
   document.getElementById('quickjoin').addEventListener('submit',e=>{
     e.preventDefault();
@@ -720,13 +738,14 @@ function joinRoom(code){
 
 function viewHome(){
   const app=document.getElementById('app');
-  app.appendChild(h('<section class="hero"><div class="hero-side you"><span class="hero-tag">◉ Tú · siempre visible</span><h2 class="hero-h">Sube tu equipo<br>a ciegas.</h2><p class="hero-p">Construye tu equipo con sprites reales, estilo pokepaste. Nadie lo verá… hasta que el rival suba el suyo.</p><div class="hero-actions"><button class="btn btn-primary btn-lg" data-act="create">➕ Crear sala y publicar</button><a class="btn btn-lg" href="#/dex">📖 Pokédex</a></div><div class="term"><div class="term-bar"><i></i><i></i><i></i></div><div class="raw-paste">Garchomp @ Choice Scarf\nAbility: Rough Skin\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Stone Edge\n- Swords Dance<span class="caret"></span></div></div></div><div class="hero-side them hero-join"><span class="hero-tag">◈ ¿Ya tienes código?</span><a class="btn btn-gold btn-join" href="#/unirse"><span class="join-ico">🔗</span><span>Unirme con código</span></a><p style="color:var(--muted);font-size:13px;max-width:32ch;margin:0">Pega el código de sala de tu rival. No verás su equipo hasta que subas el tuyo.</p></div></section>'));  app.querySelector('[data-act=create]').onclick=()=>{location.hash='#/constructor';setTimeout(()=>doCreate(true),80)};
+  app.appendChild(h('<section class="hero"><div class="hero-side you"><span class="hero-tag">◉ Tú · siempre visible</span><h2 class="hero-h">Sube tu equipo<br>a ciegas.</h2><p class="hero-p">Construye tu equipo con sprites reales, estilo pokepaste. Nadie lo verá… hasta que el rival suba el suyo.</p><div class="hero-actions"><button class="btn btn-primary btn-lg" data-act="create">➕ Crear sala y publicar</button><a class="btn btn-lg" href="#/dex">📖 Pokédex</a></div><div class="term"><div class="term-bar"><i></i><i></i><i></i></div><div class="raw-paste">Garchomp @ Choice Scarf\nAbility: Rough Skin\nEVs: 252 Atk / 4 SpD / 252 Spe\nJolly Nature\n- Earthquake\n- Dragon Claw\n- Stone Edge\n- Swords Dance<span class="caret"></span></div></div></div><div class="hero-side them hero-join"><span class="hero-tag">◈ ¿Ya tienes código?</span><a class="btn btn-gold btn-join" href="#/unirse"><span class="join-ico">🔗</span><span>Unirme con código</span></a><p style="color:var(--muted);font-size:13px;max-width:32ch;margin:0">Pega el código de sala de tu rival. No verás su equipo hasta que subas el tuyo.</p></div></section>'));  
+  app.querySelector('[data-act=create]').onclick=()=>{location.hash='#/constructor';setTimeout(()=>doCreate(true),80)};
 }
 
 function viewBuilder(){
   const app=document.getElementById('app');
   app.innerHTML='';
-  const tb=h('<div class="builder-top">'+(room?'<span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span>':'<span class="badge badge-host">Borrador</span>')+'<div class="seg" id="segsize">'+[1,2,3,4,5,6].map(n=>'<button data-n="'+n+'" class="'+(Settings.size===n?'on':'')+'">'+n+'</button>').join('')+'</div><button class="btn btn-sm" id="btn-import">📥 Pegar paste</button><button class="btn btn-sm" id="btn-export">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="btn-clear">🗑 Limpiar</button>'+(room?'<button class="btn btn-sm btn-gold" id="btn-share">🔗 Compartir</button>':'')+'<span class="evbudget" id="evb"></span><button class="btn btn-primary" id="btn-publish">'+(room?(room.mineSent?'⏳ Esperando al rival…':(room.role==='host'?'↻ Actualizar':'🔓 Enviar y desbloquear')):'➕ Crear sala y publicar')+'</button></div>');
+  const tb=h('<div class="builder-top">'+(room?'<span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span>':'<span class="badge badge-host">Borrador</span>')+'<div class="seg" id="segsize">'+[1,2,3,4,5,6].map(n=>'<button data-n="'+n+'" class="'+(Settings.size===n?'on':'')+'">'+n+'</button>').join('')+'</div><button class="btn btn-sm" id="btn-save">💾 Guardar</button><button class="btn btn-sm" id="btn-import">📥 Pegar paste</button><button class="btn btn-sm" id="btn-export">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="btn-clear">🗑 Limpiar</button>'+(room?'<button class="btn btn-sm btn-gold" id="btn-share">🔗 Compartir</button>':'')+'<span class="evbudget" id="evb"></span><button class="btn btn-primary" id="btn-publish">'+(room?(room.mineSent?'⏳ Esperando al rival…':(room.role==='host'?'↻ Actualizar':'🔓 Enviar y desbloquear')):'➕ Crear sala y publicar')+'</button></div>');
   app.appendChild(tb);
   if(room)app.appendChild(h('<div class="card" style="margin:14px 0;text-align:center"><div style="font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase">Código de sala · pásalo al rival</div><div class="code-box" style="margin:10px 0">'+room.id+'</div><button class="btn btn-sm" id="cpc">📋 Copiar código</button></div>'));
   const wb=h('<div class="workbench"><div class="slots" id="slots"></div><aside class="preview" id="preview"></aside></div>');
@@ -740,6 +759,7 @@ function viewBuilder(){
     renderSlots();
   };
   tb.querySelector('#btn-import').onclick=openImport;
+  tb.querySelector('#btn-save').onclick=saveCurrentTeam;
   tb.querySelector('#btn-export').onclick=()=>copy(exportTeam(sets.filter(s=>s.species)));
   tb.querySelector('#btn-clear').onclick=()=>{sets=sets.map(()=>({}));renderSlots();renderPreview()};
   tb.querySelector('#btn-publish').onclick=onPublish;
@@ -1052,6 +1072,7 @@ async function doCreate(silent,team){
     toast('Añade un Pokémon antes de crear la sala','warn');
     return;
   }
+  if(!Settings.name){Settings.name='Entrenador';saveSettings();}
   try{
     const r=await Store.create(real,Settings.name);
     room={id:r.id,secret:r.secret,role:r.role,status:'waiting',you:real,mineSent:false};
@@ -1113,6 +1134,14 @@ function stopPoll(){
 }
 
 // === renderRoomView ===
+function myName(){
+  if(room){const me=room.secret==='p2'?'p2':'p1';const m=room[me];if(m&&m.name)return m.name;}
+  return Settings.name||'Tú';
+}
+function foeName(){
+  if(room){const foe=room.secret==='p2'?'p1':'p2';const f=room[foe];if(f&&f.name)return f.name;}
+  return 'Rival';
+}
 function renderRoomView(){
   const app=document.getElementById('app');
   if(!location.hash.startsWith('#/sala/'))return;
@@ -1133,10 +1162,10 @@ function renderRoomView(){
   }
   const sb=h('<div style="margin:18px 0"></div>');
   app.appendChild(sb);
-  if(room.status==='waiting')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> Tu equipo está sellado. Esperando a que el rival suba el suyo…</div>'));
-  else if(room.status==='pending')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> El rival ya está dentro. <b>Sube tu equipo</b> para desbloquear.</div>'));
+  if(room.status==='waiting')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> Tu equipo está sellado, <b>'+esc(myName())+'</b>. Esperando a que el rival suba el suyo…</div>'));
+  else if(room.status==='pending')sb.appendChild(h('<div class="waiting"><span class="pulse"></span> <b>'+esc(foeName())+'</b> ya está dentro. <b>Sube tu equipo</b> para desbloquear.</div>'));
   else if(room.status==='revealed'){
-    sb.appendChild(h('<div class="waiting" style="border-color:rgba(63,214,160,.5);background:rgba(63,214,160,.08);color:#bff3df"><span class="pulse" style="background:var(--ok)"></span> ✅ ¡Intercambio completado!</div>'));
+    sb.appendChild(h('<div class="waiting" style="border-color:rgba(63,214,160,.5);background:rgba(63,214,160,.08);color:#bff3df"><span class="pulse" style="background:var(--ok)"></span> ✅ ¡Intercambio completado! <b>'+esc(myName())+'</b> vs <b>'+esc(foeName())+'</b></div>'));
     app.appendChild(buildReveal());
     stopPoll();
     return;
@@ -1155,8 +1184,8 @@ function buildReveal(){
   const mine=room.you||[],them=room.them||[];
   const wrap=h('<div class="vs-seam">VS · análisis cruzado</div><div class="reveal"></div>');
   const rev=wrap.querySelector('.reveal');
-  rev.appendChild(revealCol('🔵 Tu equipo',mine,them,true));
-  rev.appendChild(revealCol('🟡 Equipo rival',them,mine,false));
+  rev.appendChild(revealCol('🔵 Tu equipo · '+esc(myName()),mine,them,true));
+  rev.appendChild(revealCol('🟡 Equipo rival · '+esc(foeName()),them,mine,false));
   return wrap;
 }
 function revealCol(title,team,enemy,editable){
@@ -1179,7 +1208,56 @@ function revealCol(title,team,enemy,editable){
   }
   return col;
 }
-
+function teamsKey(){return 'cpaste.teams.'+(Settings.name||'_anon')}
+function loadMyTeams(){try{return JSON.parse(localStorage.getItem(teamsKey())||'[]')}catch(e){return[]}}
+function saveMyTeams(a){try{localStorage.setItem(teamsKey(),JSON.stringify(a))}catch(e){toast('Sin sitio para guardar','bad')}}
+function saveCurrentTeam(){
+  const real=sets.filter(s=>s.species);
+  if(!real.length){toast('No hay equipo que guardar','warn');return;}
+  const ta=document.createElement('textarea');
+  ta.placeholder='Nombre del equipo (p. ej. Ranked SV)';
+  ta.style.minHeight='auto';
+  modal('Guardar en Mis equipos · '+esc(Settings.name||'sin nombre'),ta,back=>{
+    back.querySelector('.modal').insertAdjacentHTML('beforeend','<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Cancelar</button><button class="btn btn-primary" data-ok>Guardar</button></div>');
+    back.querySelector('[data-x]').onclick=()=>back.remove();
+    back.querySelector('[data-ok]').onclick=()=>{
+      const name=ta.value.trim()||('Equipo '+new Date().toLocaleDateString());
+      const a=loadMyTeams();
+      a.unshift({id:Date.now(),name,team:real,created:Date.now()});
+      saveMyTeams(a);back.remove();
+      toast('Guardado como “'+name+'”','ok');
+    };
+  });
+}
+async function viewMyTeams(){
+  const app=document.getElementById('app');
+  app.innerHTML='';
+  if(!Settings.name){app.appendChild(h('<div class="card"><h3>Regístrate primero</h3><p style="color:var(--muted)">Tus equipos se guardan por nombre de entrenador.</p></div>'));ensureNameGate();return;}
+  app.appendChild(h('<h2 class="section-title">Mis equipos · <span style="color:var(--gold)">'+esc(Settings.name)+'</span></h2>'));
+  const list=loadMyTeams();
+  if(!list.length){
+    app.appendChild(h('<div class="card"><h3>Aún no tienes equipos guardados</h3><p style="color:var(--muted)">Crea un equipo en el Constructor y pulsa 💾 Guardar. Se queda aquí aunque cierres el navegador.</p><a class="btn btn-primary" href="#/constructor">Ir al Constructor</a></div>'));
+    return;
+  }
+  const box=h('<div class="roomlist"></div>');
+  app.appendChild(box);
+  for(const t of list){
+    const first=t.team&&t.team[0];
+    if(first){const d=await getPokemonDetail(first.species);if(d)dexIndexCache[first.species]=d;}
+    const names=(t.team||[]).map(s=>s.species).join(', ');
+    const row=h('<div class="roomrow"><div style="width:56px;height:56px;display:grid;place-items:center">'+(first?spr(first.species,first.form):'')+'</div><div style="min-width:0;flex:1"><b style="font-family:var(--disp);font-size:15px">'+esc(t.name)+'</b><div style="color:var(--dim);font-size:11px;font-family:var(--mono)">'+(t.team||[]).length+' Pokémon · '+new Date(t.created).toLocaleString()+'</div><div style="color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(names)+'</div></div><button class="btn btn-sm btn-primary" data-load>Usar</button><button class="btn btn-sm btn-ghost" data-dl>.txt</button><button class="btn btn-sm btn-danger" data-del>Borrar</button></div>');
+    row.querySelector('[data-load]').onclick=()=>{
+      sets=t.team.map(s=>Object.assign(blank(),s));
+      while(sets.length<Settings.size)sets.push({});
+      sets.length=Settings.size;
+      location.hash='#/constructor';
+      toast('Equipo “'+t.name+'” cargado','ok');
+    };
+    row.querySelector('[data-dl]').onclick=()=>copy(exportTeam(t.team));
+    row.querySelector('[data-del]').onclick=()=>{saveMyTeams(loadMyTeams().filter(x=>x.id!==t.id));toast('Borrado','ok');viewMyTeams();};
+    box.appendChild(row);
+  }
+}
 function viewJoin(rest){
   const app=document.getElementById('app');
   const pre=rest&&rest[0]?rest[0]:'';
@@ -1187,6 +1265,7 @@ function viewJoin(rest){
   app.querySelector('#dojoin').onclick=async()=>{
     const code=document.getElementById('join-code').value.trim().replace(/^.*\/unirse\//,'').replace(/[^A-Za-z0-9-]/g,'').toUpperCase();
     Settings.name=document.getElementById('join-name').value.trim();
+    if(!Settings.name)Settings.name='Entrenador';
     saveSettings();
     if(!code){
       toast('Introduce un código','warn');
@@ -1283,13 +1362,14 @@ function viewRooms(){
 }
 function viewSettings(){
   const app=document.getElementById('app');
-  app.appendChild(h('<h2 class="section-title">Ajustes</h2><div class="card"><div class="opt"><div><h4>Modo de salas</h4><p>Relay · backend compartido. Cualquier persona con el código puede unirse desde su dispositivo.</p></div><span class="badge badge-relay">RELAY</span></div><div class="opt"><div><h4>URL del backend Relay</h4><p>Solo cámbiala si despliegas otro worker.</p></div><input id="relayurl" value="'+esc(Store.relayUrl)+'" style="max-width:320px"></div><div class="opt"><div><h4>Estilo de sprite</h4><p>Misma fuente que pokepaste (Showdown).</p></div><select id="sstyle" style="max-width:200px">'+[['showdown','Showdown'],['ani','Gen V animado'],['gen5','Gen V estático'],['xy','XY'],['orig','Original']].map(o=>'<option value="'+o[0]+'" '+(Settings.sprite===o[0]?'selected':'')+'>'+o[1]+'</option>').join('')+'</select></div><div class="opt"><div><h4>Shiny por defecto</h4></div><input type="checkbox" id="sshiny" '+(Settings.shiny?'checked':'')+'></div><div class="opt"><div><h4>Tamaño del equipo</h4></div><select id="ssize" style="max-width:120px">'+[1,2,3,4,5,6].map(n=>'<option '+(Settings.size===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="opt"><div><h4>Tu nombre</h4></div><input id="sname" value="'+esc(Settings.name)+'" style="max-width:200px"></div><div class="opt"><div><h4>Caché Pokédex</h4></div><button class="btn btn-sm btn-danger" id="clearcache">Vaciar</button></div></div>'));
+  app.appendChild(h('<h2 class="section-title">Ajustes</h2><div class="card"><div class="opt"><div><h4>Modo de salas</h4><p>Relay · backend compartido. Cualquier persona con el código puede unirse desde su dispositivo.</p></div><span class="badge badge-relay">RELAY</span></div><div class="opt"><div><h4>URL del backend Relay</h4><p>Solo cámbiala si despliegas otro worker.</p></div><input id="relayurl" value="'+esc(Store.relayUrl)+'" style="max-width:320px"></div><div class="opt"><div><h4>Estilo de sprite</h4><p>Misma fuente que pokepaste (Showdown).</p></div><select id="sstyle" style="max-width:200px">'+[['showdown','Showdown'],['ani','Gen V animado'],['gen5','Gen V estático'],['xy','XY'],['orig','Original']].map(o=>'<option value="'+o[0]+'" '+(Settings.sprite===o[0]?'selected':'')+'>'+o[1]+'</option>').join('')+'</select></div><div class="opt"><div><h4>Shiny por defecto</h4></div><input type="checkbox" id="sshiny" '+(Settings.shiny?'checked':'')+'></div><div class="opt"><div><h4>Tamaño del equipo</h4></div><select id="ssize" style="max-width:120px">'+[1,2,3,4,5,6].map(n=>'<option '+(Settings.size===n?'selected':'')+'>'+n+'</option>').join('')+'</select></div><div class="opt"><div><h4>Tu nombre de entrenador</h4><p>Es el que se ve en la sala y en el intercambio.</p></div><div style="display:flex;gap:8px"><input id="sname" value="'+esc(Settings.name)+'" style="max-width:160px"><button class="btn btn-sm" id="changename">Cambiar</button></div></div><div class="opt"><div><h4>Caché Pokédex</h4></div><button class="btn btn-sm btn-danger" id="clearcache">Vaciar</button></div></div>'));
   app.querySelector('#relayurl').onchange=e=>{Store.relayUrl=e.target.value.trim()};
   app.querySelector('#sstyle').onchange=e=>{Settings.sprite=e.target.value;saveSettings()};
   app.querySelector('#sshiny').onchange=e=>{Settings.shiny=e.target.checked;saveSettings()};
   app.querySelector('#ssize').onchange=e=>{Settings.size=+e.target.value;saveSettings()};
   app.querySelector('#sname').onchange=e=>{Settings.name=e.target.value;saveSettings()};
   app.querySelector('#clearcache').onclick=()=>{['cpaste.dex.p','cpaste.dex.i'].forEach(k=>localStorage.removeItem(k));DexCache.pokemon=DexCache.items=null;toast('Caché vaciada','ok')};
+  app.querySelector('#changename').onclick=()=>{Settings.name='';saveSettings();ensureNameGate();};
 }
 function startBg(){
   const cv=document.getElementById('spritefield');
