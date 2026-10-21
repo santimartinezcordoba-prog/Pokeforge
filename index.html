@@ -158,14 +158,6 @@ input:-webkit-autofill:focus{
 .sn{color:var(--muted);font-weight:600}
 .sdtin{width:100%;text-align:center;background:#060a12;border:1px solid var(--line);border-radius:5px;padding:3px 2px;font-family:var(--mono);font-size:12px;color:inherit}
 .sdtfin{text-align:right;color:var(--gold);font-weight:600}
-.sdt{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:12px}
-.sdtrow{display:grid;grid-template-columns:42px 46px 1fr 46px 54px;gap:4px 6px;align-items:center;padding:2px 4px;border-radius:6px;background:#0c1220}
-.sdtrow:nth-child(even){background:#0a0f1a}
-.sdthead{display:grid;grid-template-columns:42px 46px 1fr 46px 54px;gap:4px 6px;font-size:10px;color:var(--dim);text-align:center;padding:0 4px}
-.sdthead span:first-child{text-align:left}
-.sn{color:var(--muted);font-weight:600}
-.sdtin{width:100%;text-align:center;background:#060a12;border:1px solid var(--line);border-radius:5px;padding:3px 2px;font-family:var(--mono);font-size:12px;color:inherit}
-.sdtfin{text-align:right;color:var(--gold);font-weight:600}
 .slot::before{border-radius:14px 0 0 14px}
 </style>
 </head>
@@ -422,7 +414,6 @@ function parseTeam(text){
     if(/^EVs?\s*:/i.test(t)){if(!cur)cur=blank();cur.evs=parseStatLine(t.replace(/^EVs?\s*:/i,''));continue}
     if(/^IVs?\s*:/i.test(t)){if(!cur)cur=blank();cur.ivs=parseStatLine(t.replace(/^IVs?\s*:/i,''));continue}
     if(/Nature$/i.test(t)){if(!cur)cur=blank();cur.nature=t.replace(/\s*Nature$/i,'').trim();continue}
-    // ninguna línea de metadato → es cabecera de set
     flush();cur=blank();parseHeader(t,cur);
   }
   flush();
@@ -525,7 +516,8 @@ const Store=(()=>{
   async function rel(p,b){
     const r=await fetch(relayUrl.replace(/\/$/,'')+p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
     const j=await r.json().catch(()=>({}));
-    if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;throw err;}    return j;
+    if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;throw err;}
+    return j;
   }
   return{
     mode,
@@ -535,7 +527,7 @@ const Store=(()=>{
     create:(t,n)=>rel('/api/create',{p1Name:n}).then(j=>({id:j.code,secret:j.side,role:'host'})),
     join:(id)=>rel('/api/join',{room:id}).then(j=>({id:j.code,secret:j.side,role:'guest'})),
     submit:(id,sk,t,n)=>rel('/api/submit',{room:id,side:sk,team:t,name:n}),
-    peek:(id)=>rel('/api/peek',{room:id}),
+    peek:(id,sk)=>rel('/api/peek',{room:id,side:sk}),
     myRooms:()=>[],
     forget(){}
   };
@@ -717,7 +709,7 @@ function joinRoom(code){
   (async()=>{
     try{
       const r=await Store.join(code);
-      room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[]};
+      room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[],mineSent:false};
       location.hash='#/sala/'+code;
     }catch(e){
       toast(e.message,'bad');
@@ -733,7 +725,7 @@ function viewHome(){
 function viewBuilder(){
   const app=document.getElementById('app');
   app.innerHTML='';
-  const tb=h('<div class="builder-top">'+(room?'<span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span>':'<span class="badge badge-host">Borrador</span>')+'<div class="seg" id="segsize">'+[1,2,3,4,5,6].map(n=>'<button data-n="'+n+'" class="'+(Settings.size===n?'on':'')+'">'+n+'</button>').join('')+'</div><button class="btn btn-sm" id="btn-import">📥 Pegar paste</button><button class="btn btn-sm" id="btn-export">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="btn-clear">🗑 Limpiar</button>'+(room?'<button class="btn btn-sm btn-gold" id="btn-share">🔗 Compartir</button>':'')+'<span class="evbudget" id="evb"></span><button class="btn btn-primary" id="btn-publish">'+(room?(room.role==='host'?'↻ Actualizar':'🔓 Enviar y desbloquear'):'➕ Crear sala y publicar')+'</button></div>');
+  const tb=h('<div class="builder-top">'+(room?'<span class="room-pill">🔑 <b>'+room.id+'</b></span><span class="badge badge-'+room.role+'">'+(room.role==='host'?'Anfitrión':'Rival')+'</span>':'<span class="badge badge-host">Borrador</span>')+'<div class="seg" id="segsize">'+[1,2,3,4,5,6].map(n=>'<button data-n="'+n+'" class="'+(Settings.size===n?'on':'')+'">'+n+'</button>').join('')+'</div><button class="btn btn-sm" id="btn-import">📥 Pegar paste</button><button class="btn btn-sm" id="btn-export">📋 Copiar</button><button class="btn btn-sm btn-ghost" id="btn-clear">🗑 Limpiar</button>'+(room?'<button class="btn btn-sm btn-gold" id="btn-share">🔗 Compartir</button>':'')+'<span class="evbudget" id="evb"></span><button class="btn btn-primary" id="btn-publish">'+(room?(room.mineSent?'⏳ Esperando al rival…':(room.role==='host'?'↻ Actualizar':'🔓 Enviar y desbloquear')):'➕ Crear sala y publicar')+'</button></div>');
   app.appendChild(tb);
   if(room)app.appendChild(h('<div class="card" style="margin:14px 0;text-align:center"><div style="font-size:11px;letter-spacing:.2em;color:var(--muted);text-transform:uppercase">Código de sala · pásalo al rival</div><div class="code-box" style="margin:10px 0">'+room.id+'</div><button class="btn btn-sm" id="cpc">📋 Copiar código</button></div>'));
   const wb=h('<div class="workbench"><div class="slots" id="slots"></div><aside class="preview" id="preview"></aside></div>');
@@ -756,16 +748,7 @@ function viewBuilder(){
   if(cpc)cpc.onclick=()=>copy(room.id);
   renderSlots();
   renderPreview();
-  if(room)startPoll();   // ← AÑADIDA
-}
-function statsPanelHTML(s){
-  const d=dexIndexCache[s.species];
-  if(!d)return '<div class="field"><label>Estadísticas</label><div class="stats-load">cargando datos…</div></div>';
-  const rows=STATS.map(k=>{
-    const base=d.stats[k]||0;
-    return '<div class="statrow"><span class="sl">'+STAT_ES[k]+'</span><span class="sb">'+base+'</span><span class="sbar"><i style="width:'+Math.min(100,base/255*100)+'%;background:'+statColor(base)+'"></i></span></div>';
-  }).join('');
-  return '<div class="field"><label>Estadísticas base</label><div class="statgrid">'+rows+'</div></div>';
+  if(room)startPoll();
 }
 function syncStatFinal(el,s,k){
   const d=dexIndexCache[s.species];
@@ -842,7 +825,7 @@ function slotHTML(s,i){
     const pct=Math.min(100,ev/252*100);
     return '<div class="sdtrow"><span class="sn">'+STAT_ES[k]+'</span><input class="sdtin" data-ev="'+k+'" value="'+ev+'"><div class="evbar '+(ev>=252?'max':'')+'" data-evbar="'+k+'"><i style="width:'+pct+'%"></i></div><input class="sdtin" data-iv="'+k+'" value="'+iv+'"><span class="sdtfin" data-sf="'+k+'">'+fin+'</span></div>';
   }).join('');
-  const table='<div class="field"><label>EVs / IVs <span style="color:var(--dim)">· máx 510, 252 c/u</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="sdthead"><span>Stat</span><span>EV</span><span></span><span>IV</span><span>final</span></div><div class="sdt">'+rows+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div>';
+  const table='<div class="field"><label>EVs / IVs <span style="color:var(--dim)">· máx 508, 252 c/u</span><span class="evleft" data-evleft>Restante: '+Math.floor((508-evTotal(s))/4)*4+'</span></label><div class="sdthead"><span>Stat</span><span>EV</span><span></span><span>IV</span><span>final</span></div><div class="sdt">'+rows+'</div><div class="qbtns"><button class="qbtn" data-q="252">252/4/252</button><button class="qbtn" data-q="0">Reset</button></div></div>';
   return '<div class="slot filled" data-slot="'+i+'" style="--tc:'+tc+'"><div class="slot-head"><div class="slot-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div style="min-width:0"><div class="slot-id">#'+(d.id||'—')+' · Nv '+(s.level||100)+' · '+(i+1)+'/'+Settings.size+'</div><div class="slot-name">'+(s.nickname?esc(s.nickname)+' <span style="color:var(--dim)">('+esc(s.species)+')</span>':esc(s.species))+'</div><div class="slot-item">'+itemImg(s.item)+esc(s.item||'Sin objeto')+'</div></div><div class="slot-ctl"><button class="icon-btn" data-shiny title="Shiny" style="'+(s.shiny?'color:var(--gold);border-color:var(--gold)':'')+'">✦</button><button class="icon-btn" data-dup title="Duplicar">⧉</button><button class="icon-btn" data-del title="Vaciar">✕</button></div></div><div class="slot-body"><div class="row2"><div class="field"><label>Pokémon</label><div data-combo="species"></div></div><div class="field"><label>Objeto</label><div data-combo="item"></div></div></div><div class="field"><label>Apodo</label><input type="text" data-nick value="'+esc(s.nickname||'')+'" placeholder="sin apodo" style="max-width:260px"></div><div class="row3"><div class="field"><label>Nivel</label><input type="number" min="1" max="100" data-lvl value="'+(s.level||100)+'"></div><div class="field"><label>Naturaleza</label><select data-nat style="font-size:11px"><option value="">—</option>'+NATURES.map(n=>'<option value="'+n+'" '+(s.nature===n?'selected':'')+' style="font-size:13px">'+n+' '+natHint(n)+'</option>').join('')+'</select></div><div class="field"><label>Habilidad</label><div data-combo="ability"></div></div></div>'+statsPanelHTML(s)+table+'<div class="field"><label>Movimientos</label><div class="moves">'+[0,1,2,3].map(n=>'<div data-combo="move" data-mvi="'+n+'"></div>').join('')+'</div></div></div></div>';
 }
 function renderSlots(){
@@ -879,8 +862,6 @@ function renderSlots(){
     if(dup)dup.onclick=()=>{sets[i]=JSON.parse(JSON.stringify(s));renderSlots();renderPreview()};
     const shb=el.querySelector('[data-shiny]');
     if(shb)shb.onclick=()=>{s.shiny=!s.shiny;renderSlots();renderPreview()};
-    const fs=el.querySelector('[data-form]');
-    if(fs)fs.onchange=()=>{s.form=fs.value;renderSlots();renderPreview()};
     const ns=el.querySelector('[data-nat]');
     if(ns)ns.onchange=()=>{s.nature=ns.value;renderSlots();renderPreview()};
     const nk=el.querySelector('[data-nick]');
@@ -1072,10 +1053,12 @@ async function doCreate(silent,team){
   }
   try{
     const r=await Store.create(real,Settings.name);
-    room={id:r.id,secret:r.secret,role:r.role,status:'waiting',you:real};
+    room={id:r.id,secret:r.secret,role:r.role,status:'waiting',you:real,mineSent:false};
+    await Store.submit(room.id,room.secret,exportTeam(real),Settings.name);
+    room.mineSent=true;
     viewBuilder();
     shareCode();
-    toast('Sala creada. Pasa el código al rival','ok');
+    toast('Sala creada y enviada. Pasa el código al rival','ok');
   }catch(e){
     toast(e.message||'Error','bad');
   }
@@ -1104,13 +1087,16 @@ async function ensureRevealData(){
 }
 async function refreshRoom(){
   if(!room)return;
+  let p;
   try{
-    const p=await Store.peek(room.id,room.secret);
-    room={...room,...p};
+    p=await Store.peek(room.id,room.secret);
   }catch(e){
     return;
   }
-    if(room.ready===true||room.status==='ready'||room.status==='revealed'||room.status==='complete'||(room.p1&&room.p1.team&&room.p2&&room.p2.team)){    room.status='revealed';
+  room={...room,...p};
+  const both=p&&p.p1&&p.p2&&p.p1.team&&p.p2.team;
+  if(p.ready===true||p.status==='ready'||p.status==='revealed'||p.status==='complete'||both){
+    room.status='revealed';
     await ensureRevealData();
     if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;
     else renderRoomView();
@@ -1160,7 +1146,7 @@ function renderRoomView(){
   app.appendChild(wb);
   renderSlots();
   renderPreview();
-  const pub=h('<div style="margin-top:14px"><button class="btn '+(room.role==='guest'?'btn-gold':'')+'" id="pb">'+(room.role==='host'?'↻ Actualizar mi equipo':'🔓 Enviar mi equipo')+'</button></div>');
+  const pub=h('<div style="margin-top:14px"><button class="btn '+(room.role==='guest'?'btn-gold':'')+'" id="pb" '+(room.mineSent?'disabled':'')+'>'+(room.mineSent?'⏳ Enviado, esperando al rival…':(room.role==='host'?'↻ Actualizar mi equipo':'🔓 Enviar mi equipo'))+'</button></div>');
   app.appendChild(pub);
   pub.querySelector('#pb').onclick=onPublish;
   startPoll();
@@ -1209,7 +1195,7 @@ function viewJoin(rest){
     }
     try{
       const r=await Store.join(code);
-      room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[]};
+      room={id:r.id,secret:r.secret,role:r.role,status:'pending',you:[],mineSent:false};
       location.hash='#/sala/'+code;
     }catch(e){
       toast(e.message||'No se pudo entrar','bad');
