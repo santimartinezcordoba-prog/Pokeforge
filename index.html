@@ -699,6 +699,7 @@ Store.on(()=>{if(room)refreshRoom()});
 window.addEventListener('DOMContentLoaded',()=>{
   nav();
   startBg();
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&room)refreshRoom();});
   document.getElementById('quickjoin').addEventListener('submit',e=>{
     e.preventDefault();
     const v=document.getElementById('quickjoin-input').value.trim();
@@ -1078,12 +1079,10 @@ async function ensureRevealData(){
   if(room[me]&&room[me].team)room.you=fix(parseTeam(room[me].team));
   if(room[foe]&&room[foe].team)room.them=fix(parseTeam(room[foe].team));
   const all=[...(room.you||[]),...(room.them||[])];
-  for(const s of all){
-    if(s.species&&!dexIndexCache[s.species]){
-      const d=await getPokemonDetail(s.species);
-      if(d)dexIndexCache[s.species]=d;
-    }
-  }
+  await Promise.all(all.filter(s=>s.species&&!dexIndexCache[s.species]).map(async s=>{
+    const d=await getPokemonDetail(s.species);
+    if(d)dexIndexCache[s.species]=d;
+  }));
 }
 async function refreshRoom(){
   if(!room)return;
@@ -1107,7 +1106,7 @@ async function refreshRoom(){
 }
 function startPoll(){
   stopPoll();
-  if(Store.mode==='relay')pollTimer=setInterval(()=>{if(room)refreshRoom()},800);
+  if(Store.mode==='relay')pollTimer=setInterval(()=>{if(room)refreshRoom()},400);
 }
 function stopPoll(){
   if(pollTimer){clearInterval(pollTimer);pollTimer=null}
