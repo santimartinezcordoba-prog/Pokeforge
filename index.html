@@ -1409,39 +1409,21 @@ function startBg(){
 const CP_DEFAULT_RELAY = "https://ciega-relay.santimartinezcordoba.workers.dev";
 
 let cpAccount = null;
-try {
-  cpAccount = JSON.parse(localStorage.getItem("cpaste.account") || "null");
-} catch (e) {
-  cpAccount = null;
-}
+try { cpAccount = JSON.parse(localStorage.getItem("cpaste.account") || "null"); } catch (e) { cpAccount = null; }
 
 function cpBase() {
-  return (
-    localStorage.getItem("cpaste.relay") ||
-    CP_DEFAULT_RELAY
-  ).replace(/\/+$/, "");
+  return (localStorage.getItem("cpaste.relay") || CP_DEFAULT_RELAY).replace(/\/+$/, "");
 }
 
 function cpEsc(s) {
-  return String(s || "").replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[c]));
+  return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 }
 
 async function cpApi(path, body = {}, method = "POST") {
   const headers = {};
-
-  if (cpAccount && cpAccount.token) {
-    headers["x-cpaste-token"] = cpAccount.token;
-  }
-
+  if (cpAccount && cpAccount.token) headers["x-cpaste-token"] = cpAccount.token;
   let url = cpBase() + path;
   const opts = { method, headers };
-
   if (method === "GET") {
     const qs = new URLSearchParams(body || {}).toString();
     if (qs) url += "?" + qs;
@@ -1449,24 +1431,11 @@ async function cpApi(path, body = {}, method = "POST") {
     headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body || {});
   }
-
   const res = await fetch(url, opts);
-
   let data;
-  try {
-    data = await res.json();
-  } catch (e) {
-    data = { ok: false, error: "Respuesta no JSON (" + res.status + ")" };
-  }
-
-  if (res.status === 401 && cpAccount) {
-    cpLogout(false);
-  }
-
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || ("HTTP " + res.status));
-  }
-
+  try { data = await res.json(); } catch (e) { data = { ok: false, error: "Respuesta no JSON (" + res.status + ")" }; }
+  if (res.status === 401 && cpAccount) cpLogout(false);
+  if (!res.ok || !data.ok) throw new Error(data.error || ("HTTP " + res.status));
   return data;
 }
 
@@ -1478,64 +1447,32 @@ function cpTeamsKey() {
 
 function cpSetAccount(a) {
   cpAccount = a || null;
-
-  if (cpAccount) {
-    localStorage.setItem("cpaste.account", JSON.stringify(cpAccount));
-  } else {
-    localStorage.removeItem("cpaste.account");
-  }
+  if (cpAccount) localStorage.setItem("cpaste.account", JSON.stringify(cpAccount));
+  else localStorage.removeItem("cpaste.account");
 }
 
 async function cpPullTeams(showAlert = false) {
   if (!cpAccount || !cpAccount.token) return null;
-
   const d = await cpApi("/api/teams.get", {}, "GET");
   localStorage.setItem(cpTeamsKey(), JSON.stringify(d.teams || []));
-
-  if (showAlert) {
-    alert("Equipos descargados: " + (d.teams || []).length);
-  }
-
+  if (showAlert) alert("Equipos descargados: " + (d.teams || []).length);
   return d.teams || [];
 }
 
 async function cpPushTeams(showAlert = true) {
-  if (!cpAccount || !cpAccount.token) {
-    alert("Primero inicia sesión.");
-    return;
-  }
-
-  const teams =
-    typeof loadMyTeams === "function"
-      ? loadMyTeams()
-      : JSON.parse(localStorage.getItem(cpTeamsKey()) || "[]");
-
+  if (!cpAccount || !cpAccount.token) { alert("Primero inicia sesión."); return; }
+  const teams = typeof loadMyTeams === "function" ? loadMyTeams() : JSON.parse(localStorage.getItem(cpTeamsKey()) || "[]");
   const d = await cpApi("/api/teams.save", { teams: teams || [] });
   localStorage.setItem(cpTeamsKey(), JSON.stringify(d.teams || []));
-
-  if (showAlert) {
-    alert("Equipos subidos: " + (d.teams || []).length);
-  }
-
+  if (showAlert) alert("Equipos subidos: " + (d.teams || []).length);
   return d.teams || [];
 }
 
 async function cpImportLocalTeams() {
-  if (!cpAccount || !cpAccount.token) {
-    alert("Primero inicia sesión.");
-    return;
-  }
-
-  const oldKey =
-    "cpaste.teams." + (typeof myName === "function" ? myName() : "");
-
+  if (!cpAccount || !cpAccount.token) { alert("Primero inicia sesión."); return; }
+  const oldKey = "cpaste.teams." + (typeof myName === "function" ? myName() : "");
   const old = JSON.parse(localStorage.getItem(oldKey) || "[]");
-
-  if (!old.length) {
-    alert("No hay equipos locales para importar.");
-    return;
-  }
-
+  if (!old.length) { alert("No hay equipos locales para importar."); return; }
   const d = await cpApi("/api/teams.save", { teams: old });
   localStorage.setItem(cpTeamsKey(), JSON.stringify(d.teams || []));
   alert("Importados: " + (d.teams || []).length);
@@ -1544,164 +1481,161 @@ async function cpImportLocalTeams() {
 async function cpRegister() {
   const name = (document.getElementById("cpName")?.value || "").trim();
   const pass = document.getElementById("cpPass")?.value || "";
-
-  if (!name || !pass) {
-    alert("Usuario y contraseña obligatorios");
-    return;
-  }
-
+  if (!name || !pass) { alert("Usuario y contraseña obligatorios"); return; }
   try {
     const d = await cpApi("/api/register", { name, pass });
     cpSetAccount({ token: d.token, name: d.name });
     await cpPullTeams(false);
-    cpMountAccount();
+    cpRenderChip();
+    cpCloseAccountModal();
     alert("Cuenta creada: " + d.name);
-  } catch (e) {
-    alert("No se pudo crear: " + e.message);
-  }
+  } catch (e) { alert("No se pudo crear: " + e.message); }
 }
 
 async function cpLogin() {
   const name = (document.getElementById("cpName")?.value || "").trim();
   const pass = document.getElementById("cpPass")?.value || "";
-
-  if (!name || !pass) {
-    alert("Usuario y contraseña obligatorios");
-    return;
-  }
-
+  if (!name || !pass) { alert("Usuario y contraseña obligatorios"); return; }
   try {
     const d = await cpApi("/api/login", { name, pass });
     cpSetAccount({ token: d.token, name: d.name });
     await cpPullTeams(false);
-    cpMountAccount();
+    cpRenderChip();
+    cpCloseAccountModal();
     alert("Conectado como " + d.name);
-  } catch (e) {
-    alert("No se pudo entrar: " + e.message);
-  }
+  } catch (e) { alert("No se pudo entrar: " + e.message); }
 }
 
 function cpLogout(callApi = true) {
-  if (cpAccount && cpAccount.token && callApi) {
-    cpApi("/api/logout", { token: cpAccount.token }).catch(() => {});
-  }
-
+  if (cpAccount && cpAccount.token && callApi) cpApi("/api/logout", { token: cpAccount.token }).catch(() => {});
   cpSetAccount(null);
-  cpMountAccount();
+  cpRenderChip();
 }
 
-function cpAccountPanelHTML() {
+/* ---------- MODAL ---------- */
+function cpModalHTML() {
   if (cpAccount) {
     return `
-      <div style="margin:12px;padding:12px;border:1px solid #777;border-radius:8px;">
+      <div class="cp-modal-box">
+        <button class="cp-modal-x" onclick="cpCloseAccountModal()" title="Cerrar">✕</button>
         <h3 style="margin-top:0;">Cuenta</h3>
-        <p>Conectado como <b>${cpEsc(cpAccount.name)}</b></p>
-        <button onclick="cpPullTeams(true)">Descargar equipos</button>
-        <button onclick="cpPushTeams(true)">Subir equipos</button>
-        <button onclick="cpImportLocalTeams()">Importar locales</button>
-        <button onclick="cpLogout(true)">Cerrar sesión</button>
-      </div>
-    `;
+        <p style="margin:6px 0 14px;">Conectado como <b>${cpEsc(cpAccount.name)}</b></p>
+        <div class="cp-modal-row">
+          <button onclick="cpPullTeams(true)">Descargar equipos</button>
+          <button onclick="cpPushTeams(true)">Subir equipos</button>
+        </div>
+        <div class="cp-modal-row">
+          <button onclick="cpImportLocalTeams()">Importar locales</button>
+          <button class="cp-modal-danger" onclick="cpLogout(true); cpRenderChip(); cpCloseAccountModal();">Cerrar sesión</button>
+        </div>
+        <p class="cp-modal-note">Mismo usuario + misma contraseña en dos dispositivos = mismos equipos en la nube.</p>
+      </div>`;
   }
-
   return `
-    <div style="margin:12px;padding:12px;border:1px solid #777;border-radius:8px;">
+    <div class="cp-modal-box">
+      <button class="cp-modal-x" onclick="cpCloseAccountModal()" title="Cerrar">✕</button>
       <h3 style="margin-top:0;">Cuenta</h3>
-      <input id="cpName" placeholder="Usuario" maxlength="32" style="margin-right:6px;padding:6px;">
-      <input id="cpPass" type="password" placeholder="Contraseña" maxlength="64" style="margin-right:6px;padding:6px;">
-      <button onclick="cpRegister()">Crear cuenta</button>
-      <button onclick="cpLogin()">Entrar</button>
-      <p style="margin-bottom:0;font-size:12px;opacity:.75;">
-        Mismo usuario + misma contraseña en dos dispositivos = mismos equipos en la nube.
-      </p>
-    </div>
-  `;
+      <input id="cpName" placeholder="Usuario" maxlength="32" autocomplete="username">
+      <input id="cpPass" type="password" placeholder="Contraseña" maxlength="64" autocomplete="current-password">
+      <div class="cp-modal-row">
+        <button class="cp-modal-primary" onclick="cpRegister()">Crear cuenta</button>
+        <button onclick="cpLogin()">Entrar</button>
+      </div>
+      <p class="cp-modal-note">Puedes cerrar esto con la ✕ y seguir usando la página. Para volver a abrirlo, pulsa el botón «Cuenta» abajo a la derecha.</p>
+    </div>`;
 }
 
-function cpMountAccount() {
-  const app = document.getElementById("app");
-  if (!app) return;
-
-  const h = location.hash.toLowerCase();
-  const show =
-    h.startsWith("#/ajustes") ||
-    h.startsWith("#/settings") ||
-    h.startsWith("#/config") ||
-    h.startsWith("#/cuenta") ||
-    h.startsWith("#/equipos");
-
-  let panel = document.getElementById("cpAccountPanel");
-
-  if (!show) {
-    if (panel) panel.remove();
-    return;
+function cpOpenAccountModal() {
+  let host = document.getElementById("cpModalHost");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "cpModalHost";
+    document.body.appendChild(host);
   }
+  host.innerHTML = `<div class="cp-modal-bg" onclick="if(event.target===this)cpCloseAccountModal(true)">${cpModalHTML()}</div>`;
+  const inp = host.querySelector("#cpName");
+  if (inp) setTimeout(() => inp.focus(), 30);
+  document.addEventListener("keydown", cpModalEsc);
+}
 
-  if (panel) {
-    panel.innerHTML = cpAccountPanelHTML();
-    return;
+function cpCloseAccountModal(dismiss = false) {
+  const host = document.getElementById("cpModalHost");
+  if (host) host.innerHTML = "";
+  document.removeEventListener("keydown", cpModalEsc);
+  if (dismiss && !cpAccount) sessionStorage.setItem("cpaste.loginDismissed", "1");
+}
+
+function cpModalEsc(e) { if (e.key === "Escape") cpCloseAccountModal(true); }
+
+function cpRenderChip() {
+  let chip = document.getElementById("cpChip");
+  if (!chip) {
+    chip = document.createElement("button");
+    chip.id = "cpChip";
+    chip.className = "cp-chip";
+    chip.onclick = () => { sessionStorage.removeItem("cpaste.loginDismissed"); cpOpenAccountModal(); };
+    document.body.appendChild(chip);
   }
+  chip.textContent = cpAccount ? ("👤 " + cpAccount.name) : "🔒 Cuenta";
+}
 
-  panel = document.createElement("div");
-  panel.id = "cpAccountPanel";
-  panel.innerHTML = cpAccountPanelHTML();
-  app.appendChild(panel);
+function cpMaybeOpenOnLoad() {
+  if (cpAccount) return;                       // ya logueado, no molestar
+  if (sessionStorage.getItem("cpaste.loginDismissed")) return; // lo cerró, no repetir
+  cpOpenAccountModal();
 }
 
 function cpInitAccount() {
-  cpMountAccount();
+  // estilos del modal (aislados, no pisan tu CSS)
+  if (!document.getElementById("cpModalStyle")) {
+    const st = document.createElement("style");
+    st.id = "cpModalStyle";
+    st.textContent = `
+      .cp-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1200;padding:16px;}
+      .cp-modal-box{background:#141a26;border:1px solid #3a4a66;border-radius:12px;color:#e8eefc;max-width:360px;width:100%;padding:18px 18px 14px;position:relative;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+      .cp-modal-box h3{color:#ffd24a;}
+      .cp-modal-x{position:absolute;top:8px;right:8px;background:none;border:none;color:#9fb0cc;font-size:18px;cursor:pointer;line-height:1;}
+      .cp-modal-x:hover{color:#fff;}
+      .cp-modal-box input{width:100%;box-sizing:border-box;margin:6px 0;padding:8px;border:1px solid #3a4a66;border-radius:6px;background:#0d121c;color:#e8eefc;}
+      .cp-modal-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+      .cp-modal-row button{flex:1;min-width:120px;padding:8px;border:1px solid #3a4a66;border-radius:6px;background:#1f2a40;color:#e8eefc;cursor:pointer;}
+      .cp-modal-row button:hover{background:#2a3856;}
+      .cp-modal-primary{background:#2f6df0 !important;border-color:#2f6df0 !important;}
+      .cp-modal-danger{background:#5a2430 !important;border-color:#8a3a4a !important;}
+      .cp-modal-note{font-size:12px;opacity:.7;margin:12px 0 0;}
+      .cp-chip{position:fixed;right:14px;bottom:14px;z-index:1100;background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 12px;border-radius:20px;cursor:pointer;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+      .cp-chip:hover{background:#2a3856;}
+    `;
+    document.head.appendChild(st);
+  }
+  cpRenderChip();
+  cpMaybeOpenOnLoad();
 
-  window.addEventListener("hashchange", async () => {
-    cpMountAccount();
-
+  window.addEventListener("hashchange", () => {
     if (cpAccount && cpAccount.token && location.hash.startsWith("#/equipos")) {
-      try {
-        await cpPullTeams(false);
-      } catch (e) {
-        console.warn("cpull", e);
-      }
+      cpPullTeams(false).catch(e => console.warn("cpull", e));
     }
   });
 
-  if (cpAccount && cpAccount.token) {
-    cpPullTeams(false).catch(e => {
-      console.warn("cpull init", e);
-    });
-  }
-
-  const app = document.getElementById("app");
-  if (app) {
-    new MutationObserver(() => cpMountAccount()).observe(app, { childList: true });
-  }
+  if (cpAccount && cpAccount.token) cpPullTeams(false).catch(e => console.warn("cpull init", e));
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", cpInitAccount);
-} else {
-  cpInitAccount();
-}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cpInitAccount);
+else cpInitAccount();
 
-// Si ya tienes saveCurrentTeam, lo envolvemos para que también suba a la nube.
+/* seguir subiendo a la nube cuando guardes equipo */
 if (typeof window.saveCurrentTeam === "function") {
   const _cpOldSaveCurrentTeam = window.saveCurrentTeam;
-
   window.saveCurrentTeam = async function () {
     const res = await _cpOldSaveCurrentTeam.apply(this, arguments);
-
     if (cpAccount && cpAccount.token) {
-      try {
-        await cpPushTeams(false);
-      } catch (e) {
-        console.warn("cpush", e);
-        alert("Guardado local, pero fallo al subir a la nube: " + e.message);
-      }
+      try { await cpPushTeams(false); }
+      catch (e) { console.warn("cpush", e); alert("Guardado local, pero fallo al subir a la nube: " + e.message); }
     }
-
     return res;
   };
 }
 
-// Si ya tienes teamsKey, lo redirigimos al key de cuenta.
 window.teamsKey = cpTeamsKey;
 // ---- CPASTE ACCOUNTS FRONT END ----
 </script>
