@@ -1107,7 +1107,7 @@ async function refreshRoom(){
 }
 function startPoll(){
   stopPoll();
-  if(Store.mode==='relay')pollTimer=setInterval(()=>{if(room)refreshRoom()},2500);
+  if(Store.mode==='relay')pollTimer=setInterval(()=>{if(room)refreshRoom()},800);
 }
 function stopPoll(){
   if(pollTimer){clearInterval(pollTimer);pollTimer=null}
