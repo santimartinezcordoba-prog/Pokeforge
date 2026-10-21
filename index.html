@@ -1063,8 +1063,14 @@ async function onPublish(){
       await refreshRoom();
     }
   }catch(e){
-    if(e.status===409){toast('Ya está enviado. Abriendo intercambio…','ok');await refreshRoom();}   // ← AÑADIDA
-    else toast(e.message||'Error','bad');
+    if(e.status===409){
+      toast('Sala ya revelada. Abriendo intercambio…','ok');
+      try{const p=await Store.peek(room.id);room={...room,...p};}catch(_){}
+      room.status='revealed';
+      await ensureRevealData();
+      if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;else renderRoomView();
+      stopPoll();
+    }else toast(e.message||'Error','bad');
   }
 }
 async function doCreate(silent,team){
