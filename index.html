@@ -1064,12 +1064,17 @@ async function onPublish(){
     }
   }catch(e){
     if(e.status===409){
-      toast('Sala ya revelada. Abriendo intercambio…','ok');
-      try{const p=await Store.peek(room.id);room={...room,...p};}catch(_){}
-      room.status='revealed';
-      await ensureRevealData();
-      if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;else renderRoomView();
-      stopPoll();
+      let p=null;try{p=await Store.peek(room.id);}catch(_){}
+      const both=p&&p.p1&&p.p1.submitted&&p.p2&&p.p2.submitted;
+      const done=both||p.status==='ready'||p.status==='revealed'||p.status==='complete';
+      if(done){
+        room={...room,...p};room.status='revealed';
+        await ensureRevealData();
+        if(location.hash!=='#/sala/'+room.id)location.hash='#/sala/'+room.id;else renderRoomView();
+        stopPoll();toast('Intercambio revelado','ok');
+      }else{
+        toast('Ya lo enviaste. Esperando a que el rival suba el suyo…','warn');
+      }
     }else toast(e.message||'Error','bad');
   }
 }
