@@ -21,4 +21,4 @@ http.createServer((req,res)=>{
       else send({error:'ruta desconocida'},404);
     }catch(e){send({error:String(e.message||e)},500)}
   });
-}).listen(PORT,()=>console.log('CIEGA·PASTE relay → http://localhost:'+PORT));
+}).listen(PORT,()=>console.log('PokeForge relay → http://localhost:'+PORT));
