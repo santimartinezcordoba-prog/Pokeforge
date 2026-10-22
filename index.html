@@ -1645,10 +1645,38 @@ window.teamsKey = cpTeamsKey;
 // ---- CPASTE TEAMS VIEW START ----
 let cpEditTeamId = null;
 
+function cpSetToText(s){
+  if(!s) return '';
+  if(typeof s==='string') return s;
+  const sp = s.species||s.name||s.pokemon||s.nat||'';
+  const nick = s.nick||s.nickname||'';
+  const item = s.item||'';
+  const head = (nick && sp && nick.toLowerCase()!==sp.toLowerCase()) ? `${nick} (${sp})` : (sp||nick);
+  const out = [ head + (item?` @ ${item}`:'') ];
+  if(s.level && Number(s.level)!==100) out.push(`Level: ${s.level}`);
+  if(s.nature) out.push(`${s.nature} Nature`);
+  if(s.ability) out.push(`Ability: ${s.ability}`);
+  const ev = s.evs||s.EVs||{};
+  const K=[['hp','hp'],['atk','atk'],['def','def'],['spa','spa'],['spd','spd'],['spe','spe']];
+  const evP=K.map(([k,l])=>{const v=Number(ev[k]);return v?`${v} ${l}`:'';}).filter(Boolean);
+  if(evP.length) out.push(`EVs: ${evP.join(' / ')}`);
+  const iv = s.ivs||s.IVs||{};
+  const ivP=K.map(([k,l])=>{const v=Number(iv[k]);return (v&&v!==31)?`${v} ${l}`:'';}).filter(Boolean);
+  if(ivP.length) out.push(`IVs: ${ivP.join(' / ')}`);
+  if(s.shiny) out.push('Shiny: Yes');
+  (s.moves||[]).filter(Boolean).forEach(m=>out.push(`- ${m}`));
+  return out.filter(Boolean).join('\n');
+}
+function cpTeamText(team){
+  if(typeof team==='string') return team;
+  if(Array.isArray(team)) return team.map(cpSetToText).join('\n\n').trim();
+  return '';
+}
 function cpReadTeams(){
   let a=[]; try{ a=JSON.parse(localStorage.getItem(cpTeamsKey())||'[]'); }catch(e){ a=[]; }
   if(!Array.isArray(a)) a=[];
   if(!a.length){ const old=localStorage.getItem('cpaste.teams.'+(typeof myName==='function'?myName():'')); if(old){ try{ a=JSON.parse(old); }catch(e){} if(a.length) localStorage.setItem(cpTeamsKey(), JSON.stringify(a)); } }
+  a.forEach(t=>{ if(t && t.team && typeof t.team!=='string') t.team=cpTeamText(t.team); });
   return a;
 }
 function cpWriteTeams(a){ localStorage.setItem(cpTeamsKey(), JSON.stringify(a)); if(cpAccount&&cpAccount.token) cpPushTeams(false).catch(()=>{}); }
@@ -1665,11 +1693,15 @@ function cpImportSave(){ const ta=document.getElementById('cpImp'); const txt=(t
 /* ---- MODO EDICIÓN (reutiliza el constructor, sin sala) ---- */
 function cpPatchBuilderBar(){
   const app=document.getElementById('app'); if(!app) return;
-  app.querySelectorAll('button').forEach(b=>{ const t=(b.textContent||'').toLowerCase(); if(t.includes('sala')||t.includes('enviar')||t.includes('envia')||t.includes('unirse')) b.style.display='none'; });
+  app.querySelectorAll('button').forEach(b=>{
+    if(b.closest && b.closest('#cpEditBar')) return;            // los míos, intactos
+    const t=(b.textContent||'').toLowerCase();
+    if(t.includes('sala')||t.includes('enviar')||t.includes('envia')||t.includes('unirse')||t.includes('guardar')||t.includes('💾')) b.style.display='none';
+  });
   app.querySelectorAll('input').forEach(i=>{ const p=(i.placeholder||'').toLowerCase(); if(p.includes('código')||p.includes('codigo')||p.includes('sala')) i.style.display='none'; });
   let bar=document.getElementById('cpEditBar');
   if(!bar){ bar=document.createElement('div'); bar.id='cpEditBar'; bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;'; app.insertBefore(bar, app.firstChild); }
-  bar.innerHTML=`<button onclick="cpBackToTeams()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">← Volver a Mis equipos</button><button onclick="cpSaveFromBuilder()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">💾 Guardar en Mis equipos</button>`;
+  bar.innerHTML=`<button id="cpBackBtn" onclick="cpBackToTeams()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">← Volver a Mis equipos</button><button id="cpSaveBtn" onclick="cpSaveFromBuilder()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">💾 Guardar en Mis equipos</button>`;
 }
 function cpEditView(id){
   if(typeof viewBuilder!=='function'){ document.getElementById('app').innerHTML='<p>No encuentro el constructor.</p>'; return; }
@@ -1679,8 +1711,24 @@ function cpEditView(id){
   cpPatchBuilderBar(); setTimeout(cpPatchBuilderBar,250);
 }
 async function cpSaveFromBuilder(){
-  try{ await saveCurrentTeam(); }catch(e){ alert('No se pudo guardar: '+e.message); return; }
-  cpEditTeamId=null; location.hash='#/equipos';
+  try{
+    const arr = (typeof sets!=='undefined' && Array.isArray(sets)) ? sets : [];
+    const txt = cpTeamText(arr);
+    if(!txt || !txt.trim()){ alert('El equipo está vacío'); return; }
+    const a = cpReadTeams();
+    const cur = cpEditTeamId && cpEditTeamId!=='new' ? cpFindTeam(cpEditTeamId) : null;
+    const name = prompt('Nombre para este equipo', cur ? cur.name : ('Equipo '+(a.length+1))) || (cur?cur.name:'Equipo');
+    if(cur){
+      const i = a.findIndex(t=>String(t.id)===String(cur.id));
+      if(i>=0) a[i]={id:cur.id,name,team:txt,created:cur.created||Date.now()};
+      else a.push({id:cur.id,name,team:txt,created:Date.now()});
+    }else{
+      a.push({id:'t'+Date.now(),name,team:txt,created:Date.now()});
+    }
+    cpWriteTeams(a);
+    cpEditTeamId=null;
+    cpRenderTeams();
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 function cpBackToTeams(){ cpEditTeamId=null; location.hash='#/equipos'; }
 
@@ -1688,29 +1736,250 @@ function cpBackToTeams(){ cpEditTeamId=null; location.hash='#/equipos'; }
 if(typeof window.viewBuilder==='function'){
   const _cpOldBuilder = window.viewBuilder;
   window.viewBuilder = function(){
-    const inEdit = cpEditTeamId && location.hash.indexOf('#/editar')===0;
-    if(!inEdit) cpEditTeamId=null;
+    const wasEdit = cpEditTeamId;
+    const inEdit = wasEdit && location.hash.indexOf('#/editar')===0;
+    if(wasEdit && !inEdit){ try{ sets = cpPrevSets||[]; }catch(e){} cpPrevSets=null; cpEditTeamId=null; }
     _cpOldBuilder.apply(this, arguments);
     if(inEdit){ cpPatchBuilderBar(); setTimeout(cpPatchBuilderBar,250); }
   };
 }
 if(typeof routes==='object'){ routes.editar = (rest)=>cpEditView(rest&&rest[0]); }
-
+function cpSlug(s){
+  return String(s||'').toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+function cpSpriteURL(species){
+  const slug = cpSlug(species);
+  const show = 'https://play.pokemonshowdown.com/sprites/front/'+slug+'.png';
+  let id=null;
+  try{ if(typeof idByName==='function') id=idByName(typeof canonSpecies==='function'?canonSpecies(species):species); }catch(e){}
+  const poke = id ? ('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+id+'.png') : '';
+  return {show, poke};
+}
 function cpRenderTeams(){
   const app=document.getElementById('app'); if(!app) return;
-  const who=(typeof myName==='function'?myName():'')||(cpAccount?cpAccount.name:'');
-  const teams=cpReadTeams();
-  const bar=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;">
-    <button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">➕ Crear equipo</button>
-    <button onclick="cpImportOpen()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">📥 Importar de texto</button></div>`;
-  let cards='';
-  if(!teams.length){ cards=`<div style="border:1px solid #3a4a66;border-radius:12px;padding:18px;background:#141a26;color:#e8eefc;"><h3 style="margin-top:0;">Aún no tienes equipos</h3><p style="opacity:.8;">Pulsa Crear equipo (abre el editor de 6, sin sala) o Importar de texto.</p></div>`; }
-  else cards=teams.map(t=>`<div style="border:1px solid #3a4a66;border-radius:12px;padding:14px;margin:10px 0;background:#141a26;color:#e8eefc;"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><b style="color:#ffd24a;">${cpEsc(t.name)}</b><span style="display:flex;gap:8px;flex-wrap:wrap;"><button onclick="cpExportTeam('${t.id}')" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">📋 Exportar</button><button onclick="cpDeleteTeam('${t.id}')" style="background:#5a2430;border:1px solid #8a3a4a;color:#ffd6d6;padding:6px 10px;border-radius:6px;cursor:pointer;">🗑️</button></span></div><pre style="white-space:pre-wrap;word-break:break-word;margin:10px 0 0;font-family:monospace;font-size:12px;opacity:.85;max-height:140px;overflow:auto;">${cpEsc(t.team)}</pre></div>`).join('');
-  app.innerHTML=`<h2 style="color:#ffd24a;">Mis equipos${who?' · '+cpEsc(who):''}</h2>${bar}${cards}`;
+  function slug(s){ return String(s||'').toLowerCase().replace(/['’]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+  function spriteURL(sp, shiny){
+    const sl=slug(sp);
+    const base='https://play.pokemonshowdown.com/sprites/front/';
+    const show= shiny ? base+'-/'+sl+'.png' : base+sl+'.png';
+    let id=null; try{ if(typeof idByName==='function') id=idByName(typeof canonSpecies==='function'?canonSpecies(sp):sp); }catch(e){}
+    const poke = id ? ('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/'+(shiny?'shiny/':'')+id+'.png') : '';
+    return {show, poke};
+  }
+  try{
+    const who=(typeof myName==='function'?myName():'')||(cpAccount?cpAccount.name:'');
+    const teams=cpReadTeams();
+    const bar=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;"><button onclick="cpNewTeam()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">➕ Crear equipo</button><button onclick="cpImportOpen()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">📥 Importar de texto</button></div>`;
+    let cards='';
+    if(!teams.length){
+      cards=`<div style="border:1px solid #3a4a66;border-radius:12px;padding:18px;background:#141a26;color:#e8eefc;"><h3 style="margin-top:0;">Aún no tienes equipos</h3><p style="opacity:.8;">Pulsa Crear equipo (abre el editor de 6, sin sala) o Importar de texto.</p></div>`;
+    } else {
+      cards=teams.map(t=>{
+        let sprites='';
+        try{
+          const arr=(typeof parseTeam==='function')?(parseTeam(t.team)||[]):[];
+          sprites=arr.map(s=>{
+            const sp=s.species||s.name||s.pokemon||'';
+            const nick=s.nick||s.nickname||'';
+            const shiny=!!s.shiny;
+            const u=spriteURL(sp, shiny);
+            const err=u.poke?`this.onerror=null;this.src='${u.poke}'`:`this.style.visibility='hidden'`;
+            const label=(nick && nick.toLowerCase()!==String(sp).toLowerCase())?nick+' ('+sp+')':(sp||nick||'?');
+            const star=shiny?'<span style="color:#ffd24a;">✦ </span>':'';
+            const border=shiny?'#ffd24a':'#2a3856';
+            return `<div style="text-align:center;width:64px;flex:0 0 auto;">
+              <img src="${u.show}" onerror="${err}" alt="${cpEsc(label)}" style="width:52px;height:52px;image-rendering:pixelated;background:#0d121c;border:1px solid ${border};border-radius:8px;">
+              <div style="font-size:10px;opacity:.85;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${star}${cpEsc(label)}</div>
+            </div>`;
+          }).join('');
+        }catch(e){ sprites=''; }
+        return `<div class="cp-card" onclick="location.hash='#/editar/${t.id}'" title="Clic para editar" style="border:1px solid #3a4a66;border-radius:12px;padding:14px;margin:10px 0;background:#141a26;color:#e8eefc;cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <b style="color:#ffd24a;">${cpEsc(t.name)} <span style="font-size:11px;opacity:.55;font-weight:normal;">· clic para editar</span></b>
+            <span style="display:flex;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">
+              <button onclick="event.stopPropagation();cpExportTeam('${t.id}')" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:6px 10px;border-radius:6px;cursor:pointer;">📋 Exportar</button>
+              <button onclick="event.stopPropagation();cpDeleteTeam('${t.id}')" style="background:#5a2430;border:1px solid #8a3a4a;color:#ffd6d6;padding:6px 10px;border-radius:6px;cursor:pointer;">🗑️</button>
+            </span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px;">${sprites}</div>
+        </div>`;
+      }).join('');
+    }
+    app.innerHTML=`<h2 style="color:#ffd24a;">Mis equipos${who?' · '+cpEsc(who):''}</h2>${bar}${cards}`;
+  }catch(err){
+    app.innerHTML=`<h2 style="color:#ff5566;">Error en Mis equipos</h2><pre style="white-space:pre-wrap;color:#ff8899;font-size:13px;">${err && err.stack ? err.stack : String(err)}</pre>`;
+  }
 }
-try{ routes.equipos = cpRenderTeams; }catch(e){}
-window.viewMyTeams = cpRenderTeams;
 // ---- CPASTE TEAMS VIEW END ----
+// ---- CPASTE EDIT V2 START ----
+var cpPrevSets = null;
+var cpPendingTxt = '';
+
+function cpEditView(id){
+  if(typeof viewBuilder!=='function'){ var a=document.getElementById('app'); if(a) a.innerHTML='<p>No encuentro el constructor.</p>'; return; }
+  cpPrevSets = (typeof sets!=='undefined' && Array.isArray(sets)) ? sets : [];
+  sets = (id && id!=='new' && cpFindTeam(id)) ? (parseTeam(cpFindTeam(id).team)||[]) : [];
+  cpEditTeamId = id || 'new';
+  viewBuilder();
+  var inp=document.getElementById('cpEditName');
+  if(inp){ var cur=(id&&id!=='new')?cpFindTeam(id):null; inp.value = cur? cur.name : ''; }
+}
+
+function cpPatchBuilderBar(){
+  var app=document.getElementById('app'); if(!app) return;
+  app.querySelectorAll('button').forEach(function(b){
+    if(b.closest && b.closest('#cpEditBar')) return;
+    var t=(b.textContent||'').toLowerCase();
+    if(t.indexOf('sala')>=0||t.indexOf('enviar')>=0||t.indexOf('envia')>=0||t.indexOf('unirse')>=0||t.indexOf('guardar')>=0||t.indexOf('💾')>=0) b.style.display='none';
+  });
+  app.querySelectorAll('input').forEach(function(i){
+    if(i.id==='cpEditName') return;
+    var p=(i.placeholder||'').toLowerCase();
+    if(p.indexOf('código')>=0||p.indexOf('codigo')>=0||p.indexOf('sala')>=0) i.style.display='none';
+  });
+  var bar=document.getElementById('cpEditBar');
+  if(!bar){
+    bar=document.createElement('div'); bar.id='cpEditBar';
+    bar.style.cssText='display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 14px;';
+    var cur=(cpEditTeamId&&cpEditTeamId!=='new')?cpFindTeam(cpEditTeamId):null;
+    var nm=cur?cpEsc(cur.name):'';
+    bar.innerHTML =
+      '<button onclick="cpBackToTeams()" style="background:#1f2a40;border:1px solid #3a4a66;color:#e8eefc;padding:8px 14px;border-radius:8px;cursor:pointer;">← Volver a Mis equipos</button>'+
+      '<input id="cpEditName" placeholder="Nombre del equipo" maxlength="60" value="'+nm+'" style="flex:1;min-width:160px;padding:8px;border:1px solid #3a4a66;border-radius:8px;background:#0d121c;color:#e8eefc;">'+
+      '<button onclick="cpSaveFromBuilder()" style="background:#2f6df0;border:none;color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer;">💾 Guardar en Mis equipos</button>';
+    app.insertBefore(bar, app.firstChild);
+  }
+}
+
+function cpSaveFromBuilder(){
+  var arr=(typeof sets!=='undefined'&&Array.isArray(sets))?sets:[];
+  var txt=cpTeamText(arr);
+  if(!txt||!txt.trim()){ alert('El equipo está vacío'); return; }
+  var inp=document.getElementById('cpEditName');
+  var name=(inp&&inp.value||'').trim();
+  var cur=(cpEditTeamId&&cpEditTeamId!=='new')?cpFindTeam(cpEditTeamId):null;
+  if(!name){
+    if(cur && cur.name){ name=cur.name; }
+    else { cpAskName(txt); return; }   // nuevo y sin nombre → modal bonito
+  }
+  cpCommitSave(name, txt, cur);
+}
+
+function cpCommitSave(name, txt, cur){
+  var a=cpReadTeams();
+  if(cur){
+    var i=a.findIndex(function(t){return String(t.id)===String(cur.id);});
+    if(i>=0) a[i]={id:cur.id,name:name,team:txt,created:cur.created||Date.now()};
+    else a.push({id:cur.id,name:name,team:txt,created:Date.now()});
+  } else {
+    var nid=(cpEditTeamId&&cpEditTeamId!=='new')?cpEditTeamId:('t'+Date.now());
+    a.push({id:nid,name:name,team:txt,created:Date.now()});
+  }
+  cpWriteTeams(a);
+  sets = cpPrevSets||[]; cpPrevSets=null; cpEditTeamId=null;
+  if(location.hash.indexOf('#/equipos')!==0) location.hash='#/equipos'; else cpRenderTeams();
+}
+
+function cpBackToTeams(){
+  sets = cpPrevSets||[]; cpPrevSets=null; cpEditTeamId=null;
+  if(location.hash.indexOf('#/equipos')!==0) location.hash='#/equipos'; else cpRenderTeams();
+}
+
+function cpAskName(txt){
+  cpPendingTxt=txt;
+  var host=document.getElementById('cpModalHost');
+  if(!host){ host=document.createElement('div'); host.id='cpModalHost'; document.body.appendChild(host); }
+  host.innerHTML =
+    '<div class="cp-modal-bg" onclick="if(event.target===this)cpCloseName()">'+
+      '<div class="cp-modal-box">'+
+        '<button class="cp-modal-x" onclick="cpCloseName()">✕</button>'+
+        '<h3 style="margin-top:0;">Nombre del equipo</h3>'+
+        '<p class="cp-modal-note">Ponle un nombre para guardarlo en Mis equipos.</p>'+
+        '<input id="cpAskNameIn" placeholder="Ej. Mi equipo OU" maxlength="60" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #3a4a66;border-radius:6px;background:#0d121c;color:#e8eefc;">'+
+        '<div class="cp-modal-row"><button class="cp-modal-primary" onclick="cpConfirmName()">Guardar</button><button onclick="cpCloseName()">Cancelar</button></div>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){ var i=document.getElementById('cpAskNameIn'); if(i){i.focus(); i.select();} },30);
+}
+function cpConfirmName(){
+  var i=document.getElementById('cpAskNameIn');
+  var v=(i&&i.value||'').trim();
+  if(!v){ if(i){i.style.borderColor='#ff5566';} return; }
+  cpCloseName();
+  cpCommitSave(v, cpPendingTxt, null);
+}
+function cpCloseName(){ var h=document.getElementById('cpModalHost'); if(h) h.innerHTML=''; }
+// ---- CPASTE EDIT V2 END ----
+// ---- CPASTE IMPORT V2 START ----
+var cpImpPending='';
+function cpImportOpen(prefill){
+  var host=document.getElementById('cpModalHost');
+  if(!host){ host=document.createElement('div'); host.id='cpModalHost'; document.body.appendChild(host); }
+  var v = (prefill!=null)?prefill:'';
+  host.innerHTML =
+    '<div class="cp-modal-bg" onclick="if(event.target===this)cpImportClose()">'+
+      '<div class="cp-modal-box">'+
+        '<button class="cp-modal-x" onclick="cpImportClose()">✕</button>'+
+        '<h3 style="margin:0 0 6px;padding-right:28px;">Importar equipo</h3>'+
+        '<p class="cp-modal-note" style="margin-top:0;">Pega un equipo en formato Showdown (una línea por dato).</p>'+
+        '<textarea id="cpImp" style="width:100%;height:220px;box-sizing:border-box;margin:6px 0;padding:10px;border:1px solid #3a4a66;border-radius:8px;background:#0d121c;color:#e8eefc;font-family:monospace;font-size:13px;resize:vertical;" placeholder="Corviknight @ Rocky Helmet&#10;Ability: Mirror Armor&#10;EVs: 252 Atk / 4 SpA / 252 Spe&#10;- Brave Bird">'+cpEsc(v)+'</textarea>'+
+        '<div class="cp-modal-row"><button class="cp-modal-primary" onclick="cpImportSave()">Guardar en Mis equipos</button></div>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){ var t=document.getElementById('cpImp'); if(t){t.focus(); t.setSelectionRange(t.value.length,t.value.length);} },30);
+}
+function cpImportClose(){ var h=document.getElementById('cpModalHost'); if(h) h.innerHTML=''; }
+function cpImportSave(){
+  var ta=document.getElementById('cpImp'); var txt=(ta&&ta.value||'').trim();
+  if(!txt){ alert('Pega un equipo'); return; }
+  if(typeof parseTeam==='function'){ var n=0; try{ n=(parseTeam(txt)||[]).length; }catch(e){} if(!n){ alert('No he reconocido ningún Pokémon. Revisa el formato.'); return; } }
+  cpImpPending=txt; cpAskImportName();
+}
+function cpAskImportName(){
+  var host=document.getElementById('cpModalHost');
+  if(!host){ host=document.createElement('div'); host.id='cpModalHost'; document.body.appendChild(host); }
+  host.innerHTML =
+    '<div class="cp-modal-bg">'+
+      '<div class="cp-modal-box">'+
+        '<button class="cp-modal-x" onclick="cpImportClose()">✕</button>'+
+        '<h3 style="margin:0 0 6px;padding-right:28px;">Nombre del equipo</h3>'+
+        '<p class="cp-modal-note" style="margin-top:0;">Ponle un nombre para guardarlo en Mis equipos.</p>'+
+        '<input id="cpImpName" placeholder="Ej. Mi Corviknight OU" maxlength="60" style="width:100%;box-sizing:border-box;margin:6px 0;padding:10px;border:1px solid #3a4a66;border-radius:8px;background:#0d121c;color:#e8eefc;">'+
+        '<div class="cp-modal-row"><button class="cp-modal-primary" onclick="cpConfirmImport()">Guardar</button><button onclick="cpImportOpen(cpImpPending)">Atrás</button></div>'+
+      '</div>'+
+    '</div>';
+  setTimeout(function(){
+    var i=document.getElementById('cpImpName');
+    if(i){ i.focus(); i.addEventListener('keydown', function(e){ if(e.key==='Enter') cpConfirmImport(); }); }
+  },30);
+}
+function cpConfirmImport(){
+  var i=document.getElementById('cpImpName'); var name=(i&&i.value||'').trim();
+  if(!name){ if(i){ i.style.borderColor='#ff5566'; } return; }
+  var a=cpReadTeams();
+  a.push({ id:'t'+Date.now(), name:name, team:cpImpPending, created:Date.now() });
+  cpWriteTeams(a);
+  cpImportClose();
+  cpRenderTeams();
+}
+// ---- CPASTE IMPORT V2 END ----
+</script>
+<script>
+(function(){
+  function force(){
+    try{
+      if(typeof cpRenderTeams==='function'){
+        if(typeof routes==='object') routes.equipos = cpRenderTeams;   // el router usa la mía
+        window.viewMyTeams = cpRenderTeams;                             // por si llaman a viewMyTeams() a pelo
+        if(typeof routes==='object') routes.editar = routes.editar || function(r){ cpEditView(r&&r[0]); };
+      }
+    }catch(e){ console.warn('cpForce', e); }
+  }
+  force();
+  setTimeout(force,0);
+  setTimeout(force,200);
+  window.addEventListener('hashchange', force);
+})();
 </script>
 </body>
 </html>
