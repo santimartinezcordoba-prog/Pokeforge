@@ -159,6 +159,10 @@ input:-webkit-autofill:focus{
 .sdtin{width:100%;text-align:center;background:#060a12;border:1px solid var(--line);border-radius:5px;padding:3px 2px;font-family:var(--mono);font-size:12px;color:inherit}
 .sdtfin{text-align:right;color:var(--gold);font-weight:600}
 .slot::before{border-radius:14px 0 0 14px}
+.combo-op .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.combo-op .ty{opacity:0;transform:translateX(4px);transition:opacity .18s,transform .18s}
+.combo-op.spr-ok .ty{opacity:1;transform:none}
+.ln-item img{width:14px;height:14px;image-rendering:pixelated;vertical-align:-2px}
 </style>
 </head>
 <body>
@@ -672,12 +676,15 @@ async function getPokemonDetail(name){
   if(data.name&&data.name!==name)DexCache.details[data.name]=d;
   return d;
 }
-function combo(ph,items,onPick,render){
+function combo(ph,items,onPick,render,after){
   const wrap=h('<div class="combo"><div class="combo-face"><input type="text" placeholder="'+esc(ph)+'" autocomplete="off"></div><div class="combo-pop"></div></div>');
   const inp=wrap.querySelector('input'),pop=wrap.querySelector('.combo-pop');
   let list=[],idx=-1;
-  const draw=()=>pop.innerHTML=list.map((it,i)=>'<div class="combo-op'+(i===idx?' sel':'')+'" data-i="'+i+'">'+render(it)+'</div>').join('');
-  const fill=q=>{
+  const draw=()=>{
+    pop.innerHTML=list.map((it,i)=>'<div class="combo-op'+(i===idx?' sel':'')+'" data-i="'+i+'">'+render(it)+'</div>').join('');
+    if(after)after(pop,list);
+  };
+  const fill=q=>{                                   // ← esta faltaba
     const qq=slug(q);
     list=items().filter(n=>qq.includes(slug(n))||slug(n).includes(qq)).slice(0,40);
     idx=-1;
@@ -697,8 +704,26 @@ function combo(ph,items,onPick,render){
     if(op){onPick(list[+op.dataset.i]);pop.classList.remove('on')}
   });
   document.addEventListener('click',e=>{if(!wrap.contains(e.target))pop.classList.remove('on')});
-  return{el:wrap,input:inp,redraw:()=>{if(pop.classList.contains('on'))draw();},reload:()=>{if(document.activeElement===inp)fill(inp.value);}};}
-/* ================= APP ================= */
+  return{el:wrap,input:inp,redraw:()=>{if(pop.classList.contains('on'))draw();},reload:()=>{if(document.activeElement===inp)fill(inp.value);}};
+}
+function comboSpeciesAfter(pop,list){
+  const ops=pop.querySelectorAll('.combo-op');
+  ops.forEach((op,i)=>{
+    if(i>=12) return;                                   // solo las 12 visibles, no saturar
+    const img=op.querySelector('img');
+    const ty=op.querySelector('.ty[data-name]');
+    if(!img||!ty) return;
+    const name=ty.dataset.name;
+    const show=types=>{ ty.innerHTML=(types||[]).map(miniType).join(''); op.classList.add('spr-ok'); };
+    if(dexIndexCache[name]){ show(dexIndexCache[name].types); return; }   // ya cacheado
+    const go=()=>{ if(op.dataset.ld)return; op.dataset.ld='1';
+      getPokemonDetail(name).then(d=>{ if(d){ dexIndexCache[name]=d; show(d.types); } });
+    };
+    if(img.complete && img.naturalWidth>0) go();          // sprite ya cargado
+    else img.addEventListener('load',go,{once:true});     // tipo solo cuando cargue el sprite
+  });
+}
+  /* ================= APP ================= */
 let sets=[];
 let room=null;
 let pollTimer=null;
@@ -912,10 +937,9 @@ function renderSlots(){
       renderSlots();
       renderPreview();
     };
-    const cb=combo('Buscar Pokémon…',()=>DexCache.names||(DexCache.pokemon?DexCache.names=DexCache.pokemon.map(p=>p.name):[]),pick,name=>{
-      const d=dexIndexCache[name];
-      return '<span>'+esc(name)+'</span><span class="ty">'+(d?d.types.map(miniType).join(''):'')+'</span>';
-    });
+const cb=combo('Buscar Pokémon…',()=>DexCache.names||(DexCache.pokemon?DexCache.names=DexCache.pokemon.map(p=>p.name):[]),pick,
+  name=> spr(name,'')+'<span class="nm">'+esc(name)+'</span><span class="ty" data-name="'+esc(name)+'"></span>',
+  comboSpeciesAfter);
     el.appendChild(cb.el);
     cb.input.value=(sets[i]&&sets[i].species)||'';
     cb.input.addEventListener('blur',()=>{
@@ -935,9 +959,8 @@ function renderSlots(){
     const cb=combo('Buscar objeto…',()=>DexCache.items||[],name=>{
       sets[i].item=name;
       renderSlots();
-      renderPreview();
-    },name=>'<span>'+esc(name)+'</span>');
-    el.appendChild(cb.el);
+      renderPreview()
+      },name=>itemImg(name)+'<span>'+esc(name)+'</span>');    el.appendChild(cb.el);
     cb.input.value=(sets[i]&&sets[i].item)||'';
     cb.input.addEventListener('input',()=>{
       const v=cb.input.value.trim();
@@ -995,7 +1018,7 @@ function pasteRender(real){
     const d=dexIndexCache[s.species]||{};
     const types=d.types||[];
     const tc=typeColor(types[0]||'normal');
-    return '<div class="pp-set" style="--tc:'+tc+'"><div class="pp-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="pp-lines"><div class="ln-name">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+(s.nickname?' <span class="par">('+esc(s.nickname)+')</span>':s.gender?' <span class="par">('+s.gender+')</span>':'')+(s.item?' <span class="ln-item">@ '+esc(s.item)+'</span>':'')+'</div>'+(s.ability?'<div class="ln-ab">Ability: <b>'+esc(s.ability)+'</b></div>':'')+(s.tera?'<div class="ln-meta">Tera Type: '+esc(s.tera)+'</div>':'')+(s.level&&s.level!==100?'<div class="ln-meta">Level: '+s.level+'</div>':'')+(fmtStats(s.evs)?'<div class="ln-ev">EVs: <b>'+esc(fmtStats(s.evs))+'</b></div>':'')+(fmtStats(s.ivs)?'<div class="ln-iv">IVs: '+esc(fmtStats(s.ivs))+'</div>':'')+(s.nature?'<div class="ln-nat">'+esc(s.nature)+' Nature</div>':'')+(s.moves||[]).filter(Boolean).map(m=>'<div class="ln-mv">'+esc(m)+'<span class="dot" style="background:'+typeColor(guessMoveType(m,types))+'"></span></div>').join('')+'</div></div>';
+    return '<div class="pp-set" style="--tc:'+tc+'"><div class="pp-spr">'+spr(s.species,s.form,null,s.shiny)+'</div><div class="pp-lines"><div class="ln-name">'+(s.shiny?'<span style="color:var(--gold)">✦ </span>':'')+esc(s.species)+(s.nickname?' <span class="par">('+esc(s.nickname)+')</span>':s.gender?' <span class="par">('+s.gender+')</span>':'')+(s.item?' <span class="ln-item">@ '+itemImg(s.item)+esc(s.item)+'</span>':'')+'</div>'+(s.ability?'<div class="ln-ab">Ability: <b>'+esc(s.ability)+'</b></div>':'')+(s.tera?'<div class="ln-meta">Tera Type: '+esc(s.tera)+'</div>':'')+(s.level&&s.level!==100?'<div class="ln-meta">Level: '+s.level+'</div>':'')+(fmtStats(s.evs)?'<div class="ln-ev">EVs: <b>'+esc(fmtStats(s.evs))+'</b></div>':'')+(fmtStats(s.ivs)?'<div class="ln-iv">IVs: '+esc(fmtStats(s.ivs))+'</div>':'')+(s.nature?'<div class="ln-nat">'+esc(s.nature)+' Nature</div>':'')+(s.moves||[]).filter(Boolean).map(m=>'<div class="ln-mv">'+esc(m)+'<span class="dot" style="background:'+typeColor(guessMoveType(m,types))+'"></span></div>').join('')+'</div></div>';
   }).join('')+'</div>';
 }
 function renderPreview(){
@@ -1963,6 +1986,69 @@ function cpConfirmImport(){
   cpRenderTeams();
 }
 // ---- CPASTE IMPORT V2 END ----
+// ---- CPASTE ITEM SPRITE START ----
+(function(){
+  function toID(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,''); }
+  function url(item){ const id=toID(item); return id?('https://play.pokemonshowdown.com/sprites/itemicons/'+id+'.png'):''; }
+  function isObjInput(el){
+    if(!el||el.tagName!=='INPUT') return false;
+    return /objeto/i.test(el.placeholder||'') || /objeto/i.test(el.name||'') || !!el.closest('[data-combo=item]');
+  }
+  function paintInput(inp){
+    const v=(inp.value||'').trim();
+    if(v){
+      inp.style.backgroundImage='url("'+url(v)+'")';
+      inp.style.backgroundRepeat='no-repeat';
+      inp.style.backgroundPosition='right 8px center';
+      inp.style.backgroundSize='18px 18px';
+      inp.style.paddingRight='34px';
+    } else { inp.style.backgroundImage='none'; inp.style.paddingRight=''; }
+  }
+  function inPopupOrCombo(el){
+    let n=el;
+    for(let k=0;k<8 && n;k++){
+      if(n.matches && n.matches('[data-combo=item]')) return true;
+      const pos=getComputedStyle(n).position;
+      if(pos==='absolute'||pos==='fixed'){ const r=n.getBoundingClientRect(); if(r.width>40&&r.height>20) return true; }
+      n=n.parentElement;
+    }
+    return false;
+  }
+  function itemSet(){
+    if(typeof DexCache!=='undefined' && DexCache.items && DexCache.items.length){
+      const s=new Set(); DexCache.items.forEach(x=>s.add(x)); return s;
+    }
+    return null;
+  }
+  function paintOptions(){
+    const set=itemSet(); if(!set) return;
+    document.querySelectorAll('div,li,span').forEach(function(el){
+      if(el.children.length) return;                       // solo hojas de texto
+      const txt=(el.textContent||'').trim();
+      if(!set.has(txt)) return;                            // no es un objeto
+      if(el.dataset.cpItem) return;                        // ya pintado
+      if(!inPopupOrCombo(el)) return;                      // solo dentro del desplegable/comb
+      el.dataset.cpItem='1';
+      el.style.backgroundImage='url("'+url(txt)+'")';
+      el.style.backgroundRepeat='no-repeat';
+      el.style.backgroundPosition='left 6px center';
+      el.style.backgroundSize='18px 18px';
+      el.style.paddingLeft='28px';
+    });
+  }
+  function scan(){
+    document.querySelectorAll('input').forEach(function(inp){ if(isObjInput(inp)) paintInput(inp); });
+    // paintOptions();
+  }
+  let raf=0;
+  function queue(){ if(raf)return; raf=requestAnimationFrame(function(){ raf=0; scan(); }); }
+  new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener('input',function(e){ if(isObjInput(e.target)) paintInput(e.target); },true);
+  document.addEventListener('change',function(e){ if(isObjInput(e.target)) paintInput(e.target); },true);
+  window.addEventListener('hashchange',queue);
+  queue();
+})();
+// ---- CPASTE ITEM SPRITE END ----
 </script>
 <script>
 (function(){
