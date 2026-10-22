@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="280" viewBox="0 0 960 280" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">PokeForge</title>
+  <desc id="desc">Minimalist PokeForge logo in gold yellow and electric blue, featuring a clearly divided Poké Ball-inspired forge emblem.</desc>
+  <defs>
+    <linearGradient id="gold" x1="60" y1="38" x2="195" y2="216" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF09A"/>
+      <stop offset="0.48" stop-color="#FFD43B"/>
+      <stop offset="1" stop-color="#F5A900"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="80" y1="66" x2="190" y2="206" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#62E5FF"/>
+      <stop offset="1" stop-color="#228BFF"/>
+    </linearGradient>
+    <linearGradient id="wordGold" x1="530" y1="89" x2="752" y2="173" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFE878"/>
+      <stop offset="1" stop-color="#FFBF24"/>
+    </linearGradient>
+    <linearGradient id="lowerShell" x1="80" y1="140" x2="180" y2="216" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCEBFA"/>
+    </linearGradient>
+    <filter id="halo" x="10" y="10" width="238" height="244" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+    <clipPath id="ballClip">
+      <circle cx="130" cy="137" r="79"/>
+    </clipPath>
+  </defs>
+
+  <!-- Soft blue halo, kept restrained for use on dark interfaces. -->
+  <circle cx="130" cy="137" r="91" fill="#29BFFF" opacity="0.16" filter="url(#halo)"/>
+
+  <!-- Classic ball silhouette: two contrasting hemispheres, a bold equatorial band and a central button. -->
+  <g clip-path="url(#ballClip)">
+    <rect x="49" y="56" width="162" height="81" fill="url(#gold)"/>
+    <rect x="49" y="137" width="162" height="81" fill="url(#lowerShell)"/>
+    <!-- Small forged-flame cutout gives the mark its own identity without obscuring the ball. -->
+    <path d="M130 69C139 83 139 91 130 100C122 108 118 115 122 123C125 130 132 133 139 129C146 125 148 117 144 111C156 120 159 132 152 141L108 141C101 132 104 119 113 108C123 97 128 85 130 69Z" fill="#17283F" opacity="0.94"/>
+    <path d="M130 88C137 100 133 108 127 115C122 121 121 126 125 131C130 136 137 132 137 126C145 134 143 143 136 148L123 148C115 141 115 132 121 123C127 114 130 103 130 88Z" fill="url(#blue)"/>
+    <!-- The black equatorial band remains continuous behind the button. -->
+    <rect x="47" y="128" width="166" height="18" fill="#101A2B"/>
+    <path d="M48 128.5H212" stroke="#334C69" stroke-width="1.5"/>
+    <path d="M48 145.5H212" stroke="#050A12" stroke-width="1.5"/>
+  </g>
+  <!-- Outer rim and button overlap make the Poké Ball construction unambiguous. -->
+  <circle cx="130" cy="137" r="79" stroke="#101A2B" stroke-width="8"/>
+  <circle cx="130" cy="137" r="22" fill="#101A2B" stroke="#101A2B" stroke-width="3"/>
+  <circle cx="130" cy="137" r="14" fill="#F7FBFF" stroke="#7E9DBB" stroke-width="2"/>
+  <circle cx="130" cy="137" r="6" fill="url(#blue)"/>
+  <path d="M126 132C128 130 131 130 133 132" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Tiny forge sparks: supporting detail, not part of the central ball silhouette. -->
+  <path d="M66 58L70 48L74 58L84 62L74 66L70 76L66 66L56 62Z" fill="url(#gold)"/>
+  <path d="M187 70L190 63L193 70L200 73L193 76L190 83L187 76L180 73Z" fill="url(#blue)"/>
+
+  <!-- Wordmark -->
+  <text x="258" y="151" font-family="Inter, Avenir Next, Montserrat, Arial, sans-serif" font-size="72" font-weight="750" letter-spacing="-2.4" fill="#F4F8FF">Poke<tspan fill="url(#wordGold)">Forge</tspan></text>
+  <path d="M263 181H704" stroke="#263A54" stroke-width="2" stroke-linecap="round"/>
+  <path d="M263 181H396" stroke="url(#gold)" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M405 181H442" stroke="url(#blue)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="263" y="214" font-family="Inter, Avenir Next, Montserrat, Arial, sans-serif" font-size="15" font-weight="650" letter-spacing="5.4" fill="#8FA9C9">FORGE YOUR TEAM</text>
+</svg>
