@@ -1563,7 +1563,7 @@
     );
 
     function saveSettings() {
-      localStorage.setItem('cpaste.settings', JSON(Settings));
+    localStorage.setItem('cpaste.settings', JSON.stringify(Settings));
     }
 
     /* ================= SPRITES / IMÁGENES ================= */
@@ -3992,7 +3992,7 @@
       }
 
       const inp = document.getElementById('cpEditName');
-      const name = (inp && inp.value || '').trim();
+      let name = (inp && inp.value || '').trim();
       const cur = (cpEditTeamId && cpEditTeamId !== 'new') ? cpFindTeam(cpEditTeamId) : null;
 
       if (!name) {
